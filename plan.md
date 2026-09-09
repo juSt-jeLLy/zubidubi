@@ -288,8 +288,9 @@ Responsibilities:
 - Read oracle backing value.
 - Check oracle staleness.
 - Compute time to redemption.
-- Compute discount.
-- Apply optional exposure penalty.
+- Compute time discount.
+- Apply maker inventory/exposure penalty.
+- Enforce max maker receipt exposure.
 - Set `ctx.swap.amountOut` for exact-in exits.
 - Set `ctx.swap.amountIn` for exact-out exits if needed.
 - Revert if discount or maturity violates maker limits.
@@ -319,19 +320,21 @@ Files likely involved:
 
 We append the new instruction at the end of the Aqua opcode table to preserve existing opcode positions.
 
-### Mock delayed asset
+### Underlying-backed delayed receipt asset
 
-For MVP tests, use a mock claim token.
+For Sepolia and local tests, ZubiDubi uses a real receipt contract rather than a bare mock token.
 
-Possible contract:
+Contract:
 
-- `MockExitReceipt`
+- `ZubiDubiExitReceipt`
 
-It can represent a receipt redeemable for WETH/USDC after maturity. For hackathon demo, we do not need full production redemption mechanics at first; we need enough to prove:
+It represents a transferable delayed-redemption claim. The receipt stores:
 
-- It is a transferable delayed-redemption asset.
-- It has maturity/backing parameters.
-- Taker can transfer it to maker during swap.
+- The underlying asset, such as WETH.
+- The maturity timestamp.
+- The amount of underlying assets redeemable per receipt.
+
+Before maturity, sellers can exit through ZubiDubi by selling the receipt into Aqua maker liquidity. After maturity, receipt holders can redeem the receipt for the underlying. This makes `zbETH` a concrete delayed claim, not a hardcoded token with no economic anchor.
 
 ### Oracle mock
 
@@ -384,9 +387,10 @@ The solver route:
 1. Reads active AquaExit strategies.
 2. Quotes each strategy.
 3. Checks maker virtual balance, wallet balance, and allowance.
-4. Sorts by best output after discount.
-5. Splits fill across makers.
-6. Executes atomic sequence or batch.
+4. Uses binary search to find the largest valid partial fill when a full quote exceeds maker exposure or deliverable balance.
+5. Sorts by best output after discount.
+6. Splits fill across makers.
+7. Executes atomically or reverts the whole route.
 
 Fair distribution:
 
@@ -414,7 +418,7 @@ Example:
 - Maker still earns most of the discount.
 - DAO earns from the first fill.
 
-This can be implemented by composing with existing Aqua fee instructions or by including fee logic in the AquaExit term instruction.
+The current implementation charges an output fee in `ZubiDubiRouteExecutor`, so routes quote and enforce `minAmountOut` on the net seller amount while the protocol fee is transferred to a configured fee recipient.
 
 ## Bounty alignment
 
@@ -628,11 +632,14 @@ Use `AquaSwapVMRouter`, not full `SwapVMRouter`.
 - Execute swap through modified router.
 - Assert balances and events.
 
-### Phase 3: multi-maker route
+### Phase 3: routed exit market
 
-- Add simple route executor or test helper.
-- Split one taker exit across two or three makers.
-- Show fair claim distribution and maker earnings.
+- Add onchain route executor.
+- Accept candidate Aqua strategies from the solver/indexer layer.
+- Check deliverable liquidity per maker as `min(Aqua virtual balance, wallet balance, allowance)`.
+- Quote executable fills through the modified SwapVM router.
+- Greedily split one taker exit across the best executable curves.
+- Revert atomically if aggregate fill or minimum output cannot be met.
 
 ### Phase 4: SDK support
 
@@ -653,20 +660,46 @@ Use `AquaSwapVMRouter`, not full `SwapVMRouter`.
 
 - Phase 1: custom `AquaExitTerm` SwapVM instruction added to the local `AquaSwapVMRouter` opcode table.
 - Phase 2: Aqua settlement tests prove a taker can sell delayed-exit receipt tokens and receive maker wallet-held quote tokens.
-- Phase 3: multi-maker route tests split one exit across several Aqua maker strategies with different term curves.
+- Phase 3: `ZubiDubiRouteExecutor` added. It quotes, filters, sorts, and atomically executes routed exits across multiple Aqua strategies.
 - Phase 4: TypeScript SDK support added for encoding and building the custom `aquaExitTermSwap1D` instruction.
 - Phase 5: executable Foundry demo added in `swap-vm/test/ZubiDubiDemo.t.sol`.
+- Phase 6: receipt token upgraded into an underlying-backed delayed-redemption receipt with maturity-gated redemption.
+- Phase 7: term curve upgraded with hard max exposure and maker inventory pricing.
+- Phase 8: route executor upgraded with protocol fee revenue and partial-fill recovery through binary search.
+- Sepolia: deployed Aqua, modified AquaSwapVMRouter, zbETH receipt token, route executor, and live routed demo with real Sepolia USDC and Chainlink ETH/USD.
+
+Note: the local opcode args are now 64 bytes because max exposure and inventory slope are encoded in the curve. The already-recorded Sepolia deployment used the earlier curve format, so a fresh Sepolia deployment is needed before running the upgraded live demo.
 
 ### Demo Proof
 
 `ZubiDubiDemo.t.sol` demonstrates the full ZubiDubi story:
 
-- A taker wants to immediately exit `3 mxETH`, a mock delayed-redemption receipt.
+- A taker wants to immediately exit `3 mxETH`, a delayed-redemption receipt.
 - Four makers publish Aqua strategies with wallet-held liquidity.
 - One maker has virtual Aqua liquidity but no real wallet USDC.
 - The demo route checks deliverable liquidity as `min(Aqua balance, wallet balance, allowance)` and skips that maker.
 - The remaining solvent makers fill the exit across their different term-discount curves.
 - Aqua settles real token transfers: taker receives `8,821.65 mUSDC`, makers receive the delayed-exit receipt tokens, and Aqua virtual balances update.
+
+`ZubiDubiRouteExecutor.t.sol` demonstrates the routed market layer:
+
+- Candidate strategies can arrive unsorted from an offchain solver or The Graph indexer.
+- The executor checks each maker's executable liquidity before selecting fills.
+- Makers with only virtual Aqua balance but no wallet deliverability are skipped.
+- The route fills best-price strategies first and splits the exit across multiple positions.
+- The route charges protocol revenue from output token proceeds.
+- The route cannot overcount the same maker wallet liquidity across multiple strategies.
+- The route can binary-search down to a maker's largest executable partial fill.
+- If the candidate set cannot fill the requested amount, the whole route reverts.
+
+Live Sepolia routed proof:
+
+- Route executor: `0x21dBAcFBbe7E047Efe94F846BA24FF031379B947`.
+- Seller contract: `0xdFDC728088897f167e1A1378eE404e2Ae6E4A5c1`.
+- Routed swap transaction: `0x811129fc13da8099509b6d06f3c3da850959ec7b6c65f8a399679a14e0045f18`.
+- Seller sold `0.003 zbETH`.
+- Seller received `7.251837 USDC`.
+- Maker wallet received the delayed-exit receipt exposure.
 
 ## Final submission story
 

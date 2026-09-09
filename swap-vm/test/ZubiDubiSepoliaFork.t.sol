@@ -47,7 +47,14 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
             "ZubiDubiAquaSwapVMRouter",
             "1.0.0"
         );
-        exitReceipt = new ZubiDubiExitReceipt(address(this));
+        exitReceipt = new ZubiDubiExitReceipt(
+            address(this),
+            IERC20(SEPOLIA_WETH),
+            uint40(block.timestamp + 30 days),
+            1e18,
+            "ZubiDubi ETH Exit Receipt",
+            "zbETH"
+        );
         taker = new MockTaker(aqua, swapVM, address(this));
         usdc = IERC20(SEPOLIA_USDC);
     }
@@ -157,7 +164,7 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
     function _shipExitOrder(
         address maker,
         ISwapVM.Order memory order,
-        uint256 receiptCapacity,
+        uint256,
         uint256 usdcLiquidity
     ) internal returns (bytes32 orderHash) {
         orderHash = swapVM.hash(order);
@@ -172,7 +179,7 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
         tokens[1] = SEPOLIA_USDC;
 
         uint256[] memory amounts = new uint256[](2);
-        amounts[0] = receiptCapacity;
+        amounts[0] = 0;
         amounts[1] = usdcLiquidity;
 
         vm.prank(maker);
@@ -197,7 +204,9 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
             tokenInDecimals: 18,
             tokenOutDecimals: 6,
             oracleDecimals: 8,
-            oracleAddress: SEPOLIA_CHAINLINK_ETH_USD
+            oracleAddress: SEPOLIA_CHAINLINK_ETH_USD,
+            maxExposure: 5 ether,
+            inventorySlopeBps: 0
         });
     }
 

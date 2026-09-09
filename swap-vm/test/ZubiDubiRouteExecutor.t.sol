@@ -3,25 +3,29 @@ pragma solidity 0.8.30;
 
 /// @custom:license-url https://github.com/1inch/swap-vm/blob/main/LICENSES/SwapVM-1.1.txt
 
-import { console2 } from "forge-std/console2.sol";
 import { TokenMock } from "@1inch/solidity-utils/contracts/mocks/TokenMock.sol";
 
 import { ISwapVM } from "../src/interfaces/ISwapVM.sol";
 import { MakerTraitsLib } from "../src/libs/MakerTraits.sol";
-import { TakerTraitsLib } from "../src/libs/TakerTraits.sol";
 import { AquaExitTerm, AquaExitTermArgsBuilder } from "../src/instructions/AquaExitTerm.sol";
 import { Controls, ControlsArgsBuilder } from "../src/instructions/Controls.sol";
+import { ZubiDubiRouteExecutor } from "../src/ZubiDubiRouteExecutor.sol";
 
 import { AquaSwapVMTest } from "./base/AquaSwapVMTest.sol";
 import { Program, ProgramBuilder } from "./utils/ProgramBuilder.sol";
 import { MockPriceOracle } from "./mocks/MockPriceOracle.sol";
 
-contract ZubiDubiDemoTest is AquaSwapVMTest {
+contract ZubiDubiRouteExecutorTest is AquaSwapVMTest {
     using ProgramBuilder for Program;
 
     TokenMock public exitReceipt;
     TokenMock public usdc;
     MockPriceOracle public oracle;
+    ZubiDubiRouteExecutor public routeExecutor;
+
+    address public seller = vm.addr(0x5E11);
+    address public recipient = vm.addr(0xBEEF);
+    address public feeRecipient = vm.addr(0xFEE);
 
     function setUp() public override {
         super.setUp();
@@ -29,9 +33,10 @@ contract ZubiDubiDemoTest is AquaSwapVMTest {
         exitReceipt = new TokenMock("ZubiDubi Mock Delayed Exit Receipt", "mxETH");
         usdc = new TokenMock("ZubiDubi Mock USDC", "mUSDC");
         oracle = new MockPriceOracle(3000e18, 18);
+        routeExecutor = new ZubiDubiRouteExecutor(aqua, swapVM, feeRecipient, 10);
     }
 
-    function test_ZubiDubiDemo_RoutesExitAcrossSolventAquaMakers() public {
+    function test_ZubiDubiRouteExecutor_SkipsInsolventAndSplitsBestFirst() public {
         address unavailableMaker = vm.addr(0xBADC0DE);
         address makerA = vm.addr(0xA11CE);
         address makerB = vm.addr(0xB0B);
@@ -39,22 +44,22 @@ contract ZubiDubiDemoTest is AquaSwapVMTest {
 
         ISwapVM.Order memory unavailableOrder = _createExitOrderFor(
             unavailableMaker,
-            _buildAquaExitArgs(25, 500, 250, uint40(block.timestamp + 30 days), 1 hours),
+            _buildAquaExitArgsWithExposure(25, 500, 250, uint40(block.timestamp + 30 days), 1 hours, 10 ether),
             bytes32("unavailable-maker")
         );
         ISwapVM.Order memory orderA = _createExitOrderFor(
             makerA,
-            _buildAquaExitArgs(50, 600, 300, uint40(block.timestamp + 30 days), 1 hours),
+            _buildAquaExitArgsWithExposure(50, 600, 300, uint40(block.timestamp + 30 days), 1 hours, 1 ether),
             bytes32("maker-a")
         );
         ISwapVM.Order memory orderB = _createExitOrderFor(
             makerB,
-            _buildAquaExitArgs(100, 1200, 300, uint40(block.timestamp + 30 days), 1 hours),
+            _buildAquaExitArgsWithExposure(100, 1200, 300, uint40(block.timestamp + 30 days), 1 hours, 1.5 ether),
             bytes32("maker-b")
         );
         ISwapVM.Order memory orderC = _createExitOrderFor(
             makerC,
-            _buildAquaExitArgs(200, 2400, 500, uint40(block.timestamp + 30 days), 1 hours),
+            _buildAquaExitArgsWithExposure(200, 2400, 500, uint40(block.timestamp + 30 days), 1 hours, 2 ether),
             bytes32("maker-c")
         );
 
@@ -66,119 +71,141 @@ contract ZubiDubiDemoTest is AquaSwapVMTest {
         usdc.mint(makerA, 10_000 ether);
         usdc.mint(makerB, 10_000 ether);
         usdc.mint(makerC, 10_000 ether);
-        exitReceipt.mint(address(taker), 3 ether);
+        exitReceipt.mint(seller, 3 ether);
 
-        console2.log("ZubiDubi demo: taker exits 3 mxETH immediately for wallet-held maker USDC");
+        vm.prank(seller);
+        exitReceipt.approve(address(routeExecutor), 3 ether);
 
-        uint256 skipped;
-        uint256 totalIn;
-        uint256 totalOut;
+        ISwapVM.Order[] memory orders = new ISwapVM.Order[](4);
+        orders[0] = unavailableOrder;
+        orders[1] = orderC;
+        orders[2] = orderB;
+        orders[3] = orderA;
 
-        (skipped, totalIn, totalOut) = _tryRouteLeg(unavailableOrder, 0.5 ether, skipped, totalIn, totalOut);
-        (skipped, totalIn, totalOut) = _tryRouteLeg(orderA, 1 ether, skipped, totalIn, totalOut);
-        (skipped, totalIn, totalOut) = _tryRouteLeg(orderB, 1.5 ether, skipped, totalIn, totalOut);
-        (skipped, totalIn, totalOut) = _tryRouteLeg(orderC, 0.5 ether, skipped, totalIn, totalOut);
+        (uint256 quotedIn, uint256 quotedOut,) = routeExecutor.quoteExactIn(
+            orders,
+            address(exitReceipt),
+            address(usdc),
+            3 ether
+        );
 
-        assertEq(skipped, 1);
+        assertEq(quotedIn, 3 ether);
+        assertEq(quotedOut, 8_812.82835 ether);
+
+        vm.prank(seller);
+        (uint256 totalIn, uint256 totalOut) = routeExecutor.routeExactIn(
+            orders,
+            address(exitReceipt),
+            address(usdc),
+            3 ether,
+            8_800 ether,
+            recipient
+        );
+
         assertEq(totalIn, 3 ether);
-        assertEq(totalOut, 8_821.65 ether);
-
-        assertEq(exitReceipt.balanceOf(address(taker)), 0);
-        assertEq(usdc.balanceOf(address(taker)), 8_821.65 ether);
+        assertEq(totalOut, 8_812.82835 ether);
+        assertEq(exitReceipt.balanceOf(seller), 0);
+        assertEq(usdc.balanceOf(recipient), 8_812.82835 ether);
+        assertEq(usdc.balanceOf(feeRecipient), 8.82165 ether);
+        assertEq(usdc.balanceOf(address(routeExecutor)), 0);
+        assertEq(exitReceipt.balanceOf(address(routeExecutor)), 0);
 
         assertEq(exitReceipt.balanceOf(unavailableMaker), 0);
-        assertEq(usdc.balanceOf(address(taker)), totalOut);
+        assertEq(exitReceipt.balanceOf(makerA), 1 ether);
+        assertEq(exitReceipt.balanceOf(makerB), 1.5 ether);
+        assertEq(exitReceipt.balanceOf(makerC), 0.5 ether);
 
         _assertAquaBalances(unavailableMaker, unavailableHash, 0, 10_000 ether);
-        assertEq(usdc.balanceOf(unavailableMaker), 0);
         _assertAquaBalances(makerA, orderHashA, 1 ether, 10_000 ether - 2_970.3 ether);
         _assertAquaBalances(makerB, orderHashB, 1.5 ether, 10_000 ether - 4_410.9 ether);
         _assertAquaBalances(makerC, orderHashC, 0.5 ether, 10_000 ether - 1_440.45 ether);
-
-        console2.log("ZubiDubi demo filled mxETH:", totalIn);
-        console2.log("ZubiDubi demo paid mUSDC:", totalOut);
-        console2.log("ZubiDubi skipped insolvent makers:", skipped);
     }
 
-    function _tryRouteLeg(
-        ISwapVM.Order memory order,
-        uint256 amountIn,
-        uint256 skipped,
-        uint256 totalIn,
-        uint256 totalOut
-    ) internal returns (uint256, uint256, uint256) {
-        (bool canFill, uint256 quotedOut) = _tryQuoteExactIn(order, amountIn);
+    function test_ZubiDubiRouteExecutor_RevertsWhenAggregateRouteCannotFill() public {
+        address makerA = vm.addr(0xA11CE);
+        ISwapVM.Order memory orderA = _createExitOrderFor(
+            makerA,
+            _buildAquaExitArgsWithExposure(50, 600, 300, uint40(block.timestamp + 30 days), 1 hours, 1 ether),
+            bytes32("maker-a")
+        );
+        _shipExitOrderFor(makerA, orderA, 1 ether, 10_000 ether);
 
-        if (!canFill) {
-            console2.log("Skipped maker with unavailable deliverable liquidity:", order.maker);
-            return (skipped + 1, totalIn, totalOut);
-        }
+        usdc.mint(makerA, 10_000 ether);
+        exitReceipt.mint(seller, 3 ether);
 
-        if (_deliverableUsdc(order) < quotedOut) {
-            console2.log("Skipped maker with virtual liquidity but insufficient wallet liquidity:", order.maker);
-            return (skipped + 1, totalIn, totalOut);
-        }
+        vm.prank(seller);
+        exitReceipt.approve(address(routeExecutor), 3 ether);
 
-        uint256 amountOut = _swapExactIn(order, amountIn);
-        assertEq(amountOut, quotedOut);
+        ISwapVM.Order[] memory orders = new ISwapVM.Order[](1);
+        orders[0] = orderA;
 
-        console2.log("Filled maker:", order.maker);
-        console2.log("  mxETH in:", amountIn);
-        console2.log("  mUSDC out:", amountOut);
-
-        return (skipped, totalIn + amountIn, totalOut + amountOut);
-    }
-
-    function _tryQuoteExactIn(
-        ISwapVM.Order memory order,
-        uint256 amountIn
-    ) internal returns (bool canFill, uint256 amountOut) {
-        bytes memory sigAndTakerData = abi.encodePacked(_takerData(address(taker), true));
-
-        try ISwapVM(address(swapVM)).quote(
-            order,
+        vm.expectRevert(abi.encodeWithSelector(
+            ZubiDubiRouteExecutor.ZubiDubiRouteExecutorInsufficientFill.selector,
+            3 ether,
+            1 ether
+        ));
+        vm.prank(seller);
+        routeExecutor.routeExactIn(
+            orders,
             address(exitReceipt),
             address(usdc),
-            amountIn,
-            sigAndTakerData
-        ) returns (uint256, uint256 quotedAmountOut, bytes32) {
-            return (true, quotedAmountOut);
-        } catch {
-            return (false, 0);
-        }
+            3 ether,
+            0,
+            recipient
+        );
     }
 
-    function _deliverableUsdc(ISwapVM.Order memory order) internal view returns (uint256) {
-        bytes32 orderHash = swapVM.hash(order);
-        (, uint256 aquaBalanceOut) = aqua.safeBalances(
-            order.maker,
-            address(swapVM),
-            orderHash,
-            address(exitReceipt),
-            address(usdc)
+    function test_ZubiDubiRouteExecutor_DoesNotDoubleCountSameMakerWalletLiquidity() public {
+        address sharedMaker = vm.addr(0xA11CE);
+
+        ISwapVM.Order memory orderA = _createExitOrderFor(
+            sharedMaker,
+            _buildAquaExitArgsWithExposure(50, 600, 300, uint40(block.timestamp + 30 days), 1 hours, 1 ether),
+            bytes32("maker-a")
+        );
+        ISwapVM.Order memory orderB = _createExitOrderFor(
+            sharedMaker,
+            _buildAquaExitArgsWithExposure(100, 1200, 300, uint40(block.timestamp + 30 days), 1 hours, 1 ether),
+            bytes32("maker-b")
         );
 
-        uint256 walletBalance = usdc.balanceOf(order.maker);
-        uint256 walletAllowance = usdc.allowance(order.maker, address(aqua));
+        _shipExitOrderFor(sharedMaker, orderA, 1 ether, 10_000 ether);
+        _shipExitOrderFor(sharedMaker, orderB, 1 ether, 10_000 ether);
 
-        return _min(aquaBalanceOut, _min(walletBalance, walletAllowance));
-    }
+        usdc.mint(sharedMaker, 4_000 ether);
+        exitReceipt.mint(seller, 2 ether);
 
-    function _min(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a < b ? a : b;
-    }
+        vm.prank(seller);
+        exitReceipt.approve(address(routeExecutor), 2 ether);
 
-    function _swapExactIn(ISwapVM.Order memory order, uint256 amountIn) internal returns (uint256 amountOut) {
-        SwapProgram memory swapProgram = SwapProgram({
-            amount: amountIn,
-            taker: taker,
-            tokenA: exitReceipt,
-            tokenB: usdc,
-            zeroForOne: true,
-            isExactIn: true
-        });
+        ISwapVM.Order[] memory orders = new ISwapVM.Order[](2);
+        orders[0] = orderA;
+        orders[1] = orderB;
 
-        (, amountOut) = swap(swapProgram, order);
+        (uint256 quotedIn, uint256 quotedOut,) = routeExecutor.quoteExactIn(
+            orders,
+            address(exitReceipt),
+            address(usdc),
+            2 ether
+        );
+
+        assertLt(quotedIn, 2 ether);
+        assertLe(quotedOut, 4_000 ether);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ZubiDubiRouteExecutor.ZubiDubiRouteExecutorInsufficientFill.selector, 2 ether, quotedIn
+            )
+        );
+        vm.prank(seller);
+        routeExecutor.routeExactIn(
+            orders,
+            address(exitReceipt),
+            address(usdc),
+            2 ether,
+            0,
+            recipient
+        );
     }
 
     function _buildAquaExitArgs(
@@ -187,6 +214,24 @@ contract ZubiDubiDemoTest is AquaSwapVMTest {
         uint32 maxDiscountBps,
         uint40 maturity,
         uint32 maxStaleness
+    ) internal view returns (bytes memory) {
+        return _buildAquaExitArgsWithExposure(
+            baseDiscountBps,
+            annualRateBps,
+            maxDiscountBps,
+            maturity,
+            maxStaleness,
+            5 ether
+        );
+    }
+
+    function _buildAquaExitArgsWithExposure(
+        uint32 baseDiscountBps,
+        uint32 annualRateBps,
+        uint32 maxDiscountBps,
+        uint40 maturity,
+        uint32 maxStaleness,
+        uint128 maxExposure
     ) internal view returns (bytes memory) {
         return AquaExitTermArgsBuilder.build({
             baseDiscountBps: baseDiscountBps,
@@ -198,7 +243,7 @@ contract ZubiDubiDemoTest is AquaSwapVMTest {
             tokenOutDecimals: 18,
             oracleDecimals: 18,
             oracleAddress: address(oracle),
-            maxExposure: 5 ether,
+            maxExposure: maxExposure,
             inventorySlopeBps: 0
         });
     }
@@ -279,30 +324,6 @@ contract ZubiDubiDemoTest is AquaSwapVMTest {
             postTransferOutTarget: address(0),
             postTransferOutData: "",
             program: program
-        }));
-    }
-
-    function _takerData(address takerAddress, bool isExactIn) internal pure returns (bytes memory) {
-        return TakerTraitsLib.build(TakerTraitsLib.Args({
-            taker: takerAddress,
-            isExactIn: isExactIn,
-            shouldUnwrapWeth: false,
-            hasPreTransferInCallback: true,
-            hasPreTransferOutCallback: false,
-            isStrictThresholdAmount: false,
-            isFirstTransferFromTaker: false,
-            useTransferFromAndAquaPush: false,
-            threshold: "",
-            to: address(0),
-            deadline: 0,
-            preTransferInHookData: "",
-            postTransferInHookData: "",
-            preTransferOutHookData: "",
-            postTransferOutHookData: "",
-            preTransferInCallbackData: "",
-            preTransferOutCallbackData: "",
-            instructionsArgs: "",
-            signature: ""
         }));
     }
 }

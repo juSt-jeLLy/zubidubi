@@ -59,7 +59,7 @@ contract AquaExitTermTest is AquaSwapVMTest {
             address(usdc)
         );
 
-        assertEq(receiptVirtualBalance, makerReceiptCapacity + receiptAmount);
+        assertEq(receiptVirtualBalance, receiptAmount);
         assertEq(usdcVirtualBalance, makerUsdcLiquidity - 2_940.6 ether);
     }
 
@@ -79,10 +79,12 @@ contract AquaExitTermTest is AquaSwapVMTest {
                 1 hours,
                 18,
                 6,
-                8
+                8,
+                5 ether,
+                0
             )
         );
-        shipStrategy(order, exitReceipt, usdc, makerReceiptCapacity, makerUsdcLiquidity);
+        _shipAquaExitOrderFor(maker, order, makerReceiptCapacity, makerUsdcLiquidity);
 
         SwapProgram memory swapProgram = _prepareSwap(receiptAmount, makerUsdcLiquidity, true);
 
@@ -102,8 +104,8 @@ contract AquaExitTermTest is AquaSwapVMTest {
         ISwapVM.Order memory shortOrder = _createAquaExitOrder(_buildAquaExitArgs(100, 1200, 2000, uint40(block.timestamp + 30 days), 1 hours));
         ISwapVM.Order memory longOrder = _createAquaExitOrder(_buildAquaExitArgs(100, 1200, 2000, uint40(block.timestamp + 180 days), 1 hours));
 
-        shipStrategy(swapVM, shortOrder, exitReceipt, usdc, 5 ether, 10_000 ether);
-        shipStrategy(swapVM, longOrder, exitReceipt, usdc, 5 ether, 10_000 ether);
+        _shipAquaExitOrderFor(maker, shortOrder, 5 ether, 10_000 ether);
+        _shipAquaExitOrderFor(maker, longOrder, 5 ether, 10_000 ether);
 
         SwapProgram memory swapProgram = _prepareSwap(1 ether, 20_000 ether, true);
 
@@ -118,7 +120,7 @@ contract AquaExitTermTest is AquaSwapVMTest {
     function test_AquaExitTerm_MaturedReceiptUsesBaseDiscountOnly() public {
         uint256 makerUsdcLiquidity = 10_000 ether;
         ISwapVM.Order memory order = _createAquaExitOrder(_buildAquaExitArgs(100, 1200, 300, uint40(block.timestamp + 30 days), 1 hours));
-        shipStrategy(swapVM, order, exitReceipt, usdc, 5 ether, makerUsdcLiquidity);
+        _shipAquaExitOrderFor(maker, order, 5 ether, makerUsdcLiquidity);
 
         vm.warp(block.timestamp + 31 days);
         oracle.setUpdatedAt(block.timestamp);
@@ -129,9 +131,36 @@ contract AquaExitTermTest is AquaSwapVMTest {
         assertEq(amountOut, 2_970 ether);
     }
 
+    function test_AquaExitTerm_InventoryExposureMakesLaterFillsCheaperForMaker() public {
+        uint256 makerUsdcLiquidity = 10_000 ether;
+        ISwapVM.Order memory order = _createAquaExitOrder(
+            _buildAquaExitArgsWithRisk(
+                100,
+                1_200,
+                1_000,
+                uint40(block.timestamp + 30 days),
+                1 hours,
+                2 ether,
+                500
+            )
+        );
+        bytes32 orderHash = _shipAquaExitOrderFor(maker, order, 2 ether, makerUsdcLiquidity);
+
+        exitReceipt.mint(address(taker), 2 ether);
+        usdc.mint(maker, makerUsdcLiquidity);
+
+        uint256 firstOut = _swapExactIn(order, 1 ether);
+        uint256 secondOut = _swapExactIn(order, 1 ether);
+
+        assertEq(firstOut, 2_865.6 ether);
+        assertEq(secondOut, 2_790.6 ether);
+        assertLt(secondOut, firstOut);
+        _assertAquaBalances(maker, orderHash, 2 ether, makerUsdcLiquidity - firstOut - secondOut);
+    }
+
     function test_AquaExitTerm_RevertsOnStaleOracle() public {
         ISwapVM.Order memory order = _createAquaExitOrder(_buildAquaExitArgs(100, 1200, 300, uint40(block.timestamp + 30 days), 1 hours));
-        shipStrategy(swapVM, order, exitReceipt, usdc, 5 ether, 10_000 ether);
+        _shipAquaExitOrderFor(maker, order, 5 ether, 10_000 ether);
 
         vm.warp(block.timestamp + 2 hours);
         SwapProgram memory swapProgram = _prepareSwap(1 ether, 10_000 ether, true);
@@ -142,7 +171,7 @@ contract AquaExitTermTest is AquaSwapVMTest {
 
     function test_AquaExitTerm_RevertsWhenDiscountExceedsMakerCap() public {
         ISwapVM.Order memory order = _createAquaExitOrder(_buildAquaExitArgs(100, 1200, 150, uint40(block.timestamp + 30 days), 1 hours));
-        shipStrategy(swapVM, order, exitReceipt, usdc, 5 ether, 10_000 ether);
+        _shipAquaExitOrderFor(maker, order, 5 ether, 10_000 ether);
 
         SwapProgram memory swapProgram = _prepareSwap(1 ether, 10_000 ether, true);
 
@@ -154,7 +183,7 @@ contract AquaExitTermTest is AquaSwapVMTest {
         (ISwapVM.Order memory order,) = _shipDefaultAquaExitOrder(0.5 ether, 10_000 ether);
         SwapProgram memory swapProgram = _prepareSwap(1 ether, 10_000 ether, true);
 
-        vm.expectRevert(abi.encodeWithSelector(AquaExitTerm.AquaExitTermInsufficientMakerInputCapacity.selector, uint256(1 ether), uint256(0.5 ether)));
+        vm.expectRevert(abi.encodeWithSelector(AquaExitTerm.AquaExitTermExposureLimitExceeded.selector, uint256(1 ether), uint128(0.5 ether)));
         _quoteDirect(swapProgram, order);
     }
 
@@ -238,17 +267,27 @@ contract AquaExitTermTest is AquaSwapVMTest {
         assertEq(usdc.balanceOf(makerB), makerUsdcLiquidity - outB);
         assertEq(usdc.balanceOf(makerC), makerUsdcLiquidity - outC);
 
-        _assertAquaBalances(makerA, orderHashA, 2 ether, makerUsdcLiquidity - outA);
-        _assertAquaBalances(makerB, orderHashB, 3 ether, makerUsdcLiquidity - outB);
-        _assertAquaBalances(makerC, orderHashC, 2.5 ether, makerUsdcLiquidity - outC);
+        _assertAquaBalances(makerA, orderHashA, 1 ether, makerUsdcLiquidity - outA);
+        _assertAquaBalances(makerB, orderHashB, 1.5 ether, makerUsdcLiquidity - outB);
+        _assertAquaBalances(makerC, orderHashC, 0.5 ether, makerUsdcLiquidity - outC);
     }
 
     function _shipDefaultAquaExitOrder(
         uint256 makerReceiptCapacity,
         uint256 makerUsdcLiquidity
     ) internal returns (ISwapVM.Order memory order, bytes32 orderHash) {
-        order = _createAquaExitOrder(_buildAquaExitArgs(100, 1200, 300, uint40(block.timestamp + 30 days), 1 hours));
-        orderHash = shipStrategy(order, exitReceipt, usdc, makerReceiptCapacity, makerUsdcLiquidity);
+        order = _createAquaExitOrder(
+            _buildAquaExitArgsWithRisk(
+                100,
+                1200,
+                300,
+                uint40(block.timestamp + 30 days),
+                1 hours,
+                uint128(makerReceiptCapacity),
+                0
+            )
+        );
+        orderHash = _shipAquaExitOrderFor(maker, order, makerReceiptCapacity, makerUsdcLiquidity);
     }
 
     function _prepareSwap(
@@ -286,7 +325,32 @@ contract AquaExitTermTest is AquaSwapVMTest {
             maxStaleness,
             18,
             18,
-            18
+            18,
+            5 ether,
+            0
+        );
+    }
+
+    function _buildAquaExitArgsWithRisk(
+        uint32 baseDiscountBps,
+        uint32 annualRateBps,
+        uint32 maxDiscountBps,
+        uint40 maturity,
+        uint32 maxStaleness,
+        uint128 maxExposure,
+        uint32 inventorySlopeBps
+    ) internal view returns (bytes memory) {
+        return _buildAquaExitArgsWithDecimals(
+            baseDiscountBps,
+            annualRateBps,
+            maxDiscountBps,
+            maturity,
+            maxStaleness,
+            18,
+            18,
+            18,
+            maxExposure,
+            inventorySlopeBps
         );
     }
 
@@ -298,7 +362,9 @@ contract AquaExitTermTest is AquaSwapVMTest {
         uint32 maxStaleness,
         uint8 tokenInDecimals,
         uint8 tokenOutDecimals,
-        uint8 oracleDecimals
+        uint8 oracleDecimals,
+        uint128 maxExposure,
+        uint32 inventorySlopeBps
     ) internal view returns (bytes memory) {
         return AquaExitTermArgsBuilder.build({
             baseDiscountBps: baseDiscountBps,
@@ -309,7 +375,9 @@ contract AquaExitTermTest is AquaSwapVMTest {
             tokenInDecimals: tokenInDecimals,
             tokenOutDecimals: tokenOutDecimals,
             oracleDecimals: oracleDecimals,
-            oracleAddress: address(oracle)
+            oracleAddress: address(oracle),
+            maxExposure: maxExposure,
+            inventorySlopeBps: inventorySlopeBps
         });
     }
 
@@ -345,7 +413,7 @@ contract AquaExitTermTest is AquaSwapVMTest {
     function _shipAquaExitOrderFor(
         address makerAddress,
         ISwapVM.Order memory order,
-        uint256 receiptCapacity,
+        uint256,
         uint256 usdcLiquidity
     ) internal returns (bytes32 orderHash) {
         orderHash = swapVM.hash(order);
@@ -360,7 +428,7 @@ contract AquaExitTermTest is AquaSwapVMTest {
         tokens[1] = address(usdc);
 
         uint256[] memory amounts = new uint256[](2);
-        amounts[0] = receiptCapacity;
+        amounts[0] = 0;
         amounts[1] = usdcLiquidity;
 
         vm.prank(makerAddress);

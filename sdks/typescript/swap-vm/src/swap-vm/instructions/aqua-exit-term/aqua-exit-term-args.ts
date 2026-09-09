@@ -6,6 +6,8 @@ import assert from 'assert'
 import { AquaExitTermArgsCoder } from './aqua-exit-term-args-coder'
 import type { IArgsCoder, IArgsData } from '../types'
 
+const UINT_128_MAX = (1n << 128n) - 1n
+
 export class AquaExitTermArgs implements IArgsData {
   public static readonly CODER: IArgsCoder<AquaExitTermArgs> = new AquaExitTermArgsCoder()
 
@@ -19,6 +21,8 @@ export class AquaExitTermArgs implements IArgsData {
     public readonly tokenOutDecimals: bigint,
     public readonly oracleDecimals: bigint,
     public readonly oracleAddress: Address,
+    public readonly maxExposure: bigint,
+    public readonly inventorySlopeBps: bigint,
   ) {
     assert(
       baseDiscountBps >= 0n && baseDiscountBps <= UINT_32_MAX,
@@ -57,6 +61,15 @@ export class AquaExitTermArgs implements IArgsData {
       oracleDecimals >= 0n && oracleDecimals <= UINT_8_MAX,
       `Invalid oracleDecimals: ${oracleDecimals}. Must be a valid uint8`,
     )
+    assert(
+      maxExposure >= 0n && maxExposure <= UINT_128_MAX,
+      `Invalid maxExposure: ${maxExposure}. Must be a valid uint128`,
+    )
+    assert(
+      inventorySlopeBps >= 0n && inventorySlopeBps <= UINT_32_MAX,
+      `Invalid inventorySlopeBps: ${inventorySlopeBps}. Must be a valid uint32`,
+    )
+    assert(inventorySlopeBps < 10_000n, `Inventory slope must be less than 10000 bps`)
   }
 
   static decode(data: HexString): AquaExitTermArgs {
@@ -74,6 +87,8 @@ export class AquaExitTermArgs implements IArgsData {
       tokenOutDecimals: this.tokenOutDecimals.toString(),
       oracleDecimals: this.oracleDecimals.toString(),
       oracleAddress: this.oracleAddress.toString(),
+      maxExposure: this.maxExposure.toString(),
+      inventorySlopeBps: this.inventorySlopeBps.toString(),
     }
   }
 }

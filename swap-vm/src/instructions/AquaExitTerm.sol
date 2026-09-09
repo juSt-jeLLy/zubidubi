@@ -29,7 +29,10 @@ library AquaExitTermArgsBuilder {
     error AquaExitTermMissingTokenOutDecimalsArg();
     error AquaExitTermMissingOracleDecimalsArg();
     error AquaExitTermMissingOracleAddressArg();
+    error AquaExitTermMissingMaxExposureArg();
+    error AquaExitTermMissingInventorySlopeArg();
     error AquaExitTermTokenDecimalsTooHigh(uint8 decimals);
+    error AquaExitTermInventorySlopeTooHigh(uint32 inventorySlopeBps);
 
     /// @param baseDiscountBps Fixed maker spread in basis points.
     /// @param annualRateBps Annualized duration discount in basis points.
@@ -49,11 +52,14 @@ library AquaExitTermArgsBuilder {
         uint8 tokenInDecimals,
         uint8 tokenOutDecimals,
         uint8 oracleDecimals,
-        address oracleAddress
+        address oracleAddress,
+        uint128 maxExposure,
+        uint32 inventorySlopeBps
     ) internal pure returns (bytes memory) {
         require(baseDiscountBps < BPS, AquaExitTermBaseDiscountTooHigh(baseDiscountBps));
         require(annualRateBps < BPS, AquaExitTermAnnualRateTooHigh(annualRateBps));
         require(maxDiscountBps < BPS, AquaExitTermMaxDiscountTooHigh(maxDiscountBps));
+        require(inventorySlopeBps < BPS, AquaExitTermInventorySlopeTooHigh(inventorySlopeBps));
         require(tokenInDecimals <= 36, AquaExitTermTokenDecimalsTooHigh(tokenInDecimals));
         require(tokenOutDecimals <= 36, AquaExitTermTokenDecimalsTooHigh(tokenOutDecimals));
 
@@ -66,7 +72,9 @@ library AquaExitTermArgsBuilder {
             tokenInDecimals,
             tokenOutDecimals,
             oracleDecimals,
-            oracleAddress
+            oracleAddress,
+            maxExposure,
+            inventorySlopeBps
         );
     }
 
@@ -79,7 +87,9 @@ library AquaExitTermArgsBuilder {
         uint8 tokenInDecimals,
         uint8 tokenOutDecimals,
         uint8 oracleDecimals,
-        address oracleAddress
+        address oracleAddress,
+        uint128 maxExposure,
+        uint32 inventorySlopeBps
     ) {
         baseDiscountBps = uint32(bytes4(args.slice(0, 4, AquaExitTermMissingBaseDiscountArg.selector)));
         annualRateBps = uint32(bytes4(args.slice(4, 8, AquaExitTermMissingAnnualRateArg.selector)));
@@ -90,6 +100,8 @@ library AquaExitTermArgsBuilder {
         tokenOutDecimals = uint8(bytes1(args.slice(22, 23, AquaExitTermMissingTokenOutDecimalsArg.selector)));
         oracleDecimals = uint8(bytes1(args.slice(23, 24, AquaExitTermMissingOracleDecimalsArg.selector)));
         oracleAddress = address(bytes20(args.slice(24, 44, AquaExitTermMissingOracleAddressArg.selector)));
+        maxExposure = uint128(bytes16(args.slice(44, 60, AquaExitTermMissingMaxExposureArg.selector)));
+        inventorySlopeBps = uint32(bytes4(args.slice(60, 64, AquaExitTermMissingInventorySlopeArg.selector)));
     }
 }
 
@@ -110,7 +122,7 @@ contract AquaExitTerm {
     error AquaExitTermDiscountExceedsPar(uint256 discountBps);
     error AquaExitTermRequiresInputAmount();
     error AquaExitTermRequiresOutputAmount();
-    error AquaExitTermInsufficientMakerInputCapacity(uint256 amountIn, uint256 balanceIn);
+    error AquaExitTermExposureLimitExceeded(uint256 exposureAfter, uint128 maxExposure);
     error AquaExitTermInsufficientMakerOutputLiquidity(uint256 amountOut, uint256 balanceOut);
 
     /// @param args.baseDiscountBps  | 4 bytes
@@ -122,6 +134,8 @@ contract AquaExitTerm {
     /// @param args.tokenOutDecimals | 1 byte
     /// @param args.oracleDecimals   | 1 byte
     /// @param args.oracleAddress    | 20 bytes
+    /// @param args.maxExposure      | 16 bytes
+    /// @param args.inventorySlopeBps| 4 bytes
     function _aquaExitTermSwap1D(Context memory ctx, bytes calldata args) internal view {
         (
             uint32 baseDiscountBps,
@@ -132,27 +146,43 @@ contract AquaExitTerm {
             uint8 tokenInDecimals,
             uint8 tokenOutDecimals,
             uint8 oracleDecimals,
-            address oracleAddress
+            address oracleAddress,
+            uint128 maxExposure,
+            uint32 inventorySlopeBps
         ) = AquaExitTermArgsBuilder.parse(args);
 
         uint256 price = _oraclePrice1e18(oracleAddress, oracleDecimals, maxStaleness);
-        uint256 discountBps = _discountBps(baseDiscountBps, annualRateBps, maturity);
-
-        require(discountBps <= maxDiscountBps, AquaExitTermDiscountTooHigh(discountBps, maxDiscountBps));
-        require(discountBps < _BPS, AquaExitTermDiscountExceedsPar(discountBps));
-
-        uint256 payoutFactorBps = _BPS - discountBps;
 
         if (ctx.query.isExactIn) {
             require(ctx.swap.amountIn > 0, AquaExitTermRequiresInputAmount());
-            require(ctx.swap.amountIn <= ctx.swap.balanceIn, AquaExitTermInsufficientMakerInputCapacity(ctx.swap.amountIn, ctx.swap.balanceIn));
-            ctx.swap.amountOut = ctx.swap.amountIn * price * (10 ** tokenOutDecimals) * payoutFactorBps / (10 ** tokenInDecimals) / 1e18 / _BPS;
+            uint256 discountBps = _checkedDiscountBps(
+                baseDiscountBps,
+                annualRateBps,
+                maturity,
+                ctx.swap.balanceIn,
+                ctx.swap.amountIn,
+                maxExposure,
+                inventorySlopeBps,
+                maxDiscountBps
+            );
+            ctx.swap.amountOut = _amountOut(ctx.swap.amountIn, price, tokenInDecimals, tokenOutDecimals, discountBps);
             require(ctx.swap.amountOut <= ctx.swap.balanceOut, AquaExitTermInsufficientMakerOutputLiquidity(ctx.swap.amountOut, ctx.swap.balanceOut));
         } else {
             require(ctx.swap.amountOut > 0, AquaExitTermRequiresOutputAmount());
             require(ctx.swap.amountOut <= ctx.swap.balanceOut, AquaExitTermInsufficientMakerOutputLiquidity(ctx.swap.amountOut, ctx.swap.balanceOut));
-            ctx.swap.amountIn = (ctx.swap.amountOut * (10 ** tokenInDecimals) * 1e18 * _BPS).ceilDiv(price * (10 ** tokenOutDecimals) * payoutFactorBps);
-            require(ctx.swap.amountIn <= ctx.swap.balanceIn, AquaExitTermInsufficientMakerInputCapacity(ctx.swap.amountIn, ctx.swap.balanceIn));
+            ctx.swap.amountIn = _amountInWithInventory(
+                ctx.swap.amountOut,
+                price,
+                tokenInDecimals,
+                tokenOutDecimals,
+                baseDiscountBps,
+                annualRateBps,
+                maturity,
+                ctx.swap.balanceIn,
+                maxExposure,
+                inventorySlopeBps,
+                maxDiscountBps
+            );
         }
     }
 
@@ -177,7 +207,29 @@ contract AquaExitTerm {
         }
     }
 
-    function _discountBps(
+    function _checkedDiscountBps(
+        uint32 baseDiscountBps,
+        uint32 annualRateBps,
+        uint40 maturity,
+        uint256 currentExposure,
+        uint256 fillAmount,
+        uint128 maxExposure,
+        uint32 inventorySlopeBps,
+        uint32 maxDiscountBps
+    ) private view returns (uint256 discountBps) {
+        uint256 exposureAfter = currentExposure + fillAmount;
+        require(maxExposure == 0 || exposureAfter <= maxExposure, AquaExitTermExposureLimitExceeded(exposureAfter, maxExposure));
+
+        discountBps = _termDiscountBps(baseDiscountBps, annualRateBps, maturity);
+        if (maxExposure > 0 && inventorySlopeBps > 0) {
+            discountBps += uint256(inventorySlopeBps) * exposureAfter / maxExposure;
+        }
+
+        require(discountBps <= maxDiscountBps, AquaExitTermDiscountTooHigh(discountBps, maxDiscountBps));
+        require(discountBps < _BPS, AquaExitTermDiscountExceedsPar(discountBps));
+    }
+
+    function _termDiscountBps(
         uint32 baseDiscountBps,
         uint32 annualRateBps,
         uint40 maturity
@@ -189,5 +241,65 @@ contract AquaExitTerm {
         uint256 secondsToMaturity = uint256(maturity) - block.timestamp;
         uint256 durationDiscountBps = uint256(annualRateBps) * secondsToMaturity / _YEAR;
         return uint256(baseDiscountBps) + durationDiscountBps;
+    }
+
+    function _amountOut(
+        uint256 amountIn,
+        uint256 price,
+        uint8 tokenInDecimals,
+        uint8 tokenOutDecimals,
+        uint256 discountBps
+    ) private pure returns (uint256) {
+        return amountIn * price * (10 ** tokenOutDecimals) * (_BPS - discountBps) / (10 ** tokenInDecimals) / 1e18 / _BPS;
+    }
+
+    function _amountIn(
+        uint256 amountOut,
+        uint256 price,
+        uint8 tokenInDecimals,
+        uint8 tokenOutDecimals,
+        uint256 discountBps
+    ) private pure returns (uint256) {
+        return (amountOut * (10 ** tokenInDecimals) * 1e18 * _BPS).ceilDiv(price * (10 ** tokenOutDecimals) * (_BPS - discountBps));
+    }
+
+    function _amountInWithInventory(
+        uint256 amountOut,
+        uint256 price,
+        uint8 tokenInDecimals,
+        uint8 tokenOutDecimals,
+        uint32 baseDiscountBps,
+        uint32 annualRateBps,
+        uint40 maturity,
+        uint256 currentExposure,
+        uint128 maxExposure,
+        uint32 inventorySlopeBps,
+        uint32 maxDiscountBps
+    ) private view returns (uint256 amountIn) {
+        uint256 discountBps = _checkedDiscountBps(
+            baseDiscountBps,
+            annualRateBps,
+            maturity,
+            currentExposure,
+            0,
+            maxExposure,
+            inventorySlopeBps,
+            maxDiscountBps
+        );
+        amountIn = _amountIn(amountOut, price, tokenInDecimals, tokenOutDecimals, discountBps);
+
+        for (uint256 i = 0; i < 3; i++) {
+            discountBps = _checkedDiscountBps(
+                baseDiscountBps,
+                annualRateBps,
+                maturity,
+                currentExposure,
+                amountIn,
+                maxExposure,
+                inventorySlopeBps,
+                maxDiscountBps
+            );
+            amountIn = _amountIn(amountOut, price, tokenInDecimals, tokenOutDecimals, discountBps);
+        }
     }
 }

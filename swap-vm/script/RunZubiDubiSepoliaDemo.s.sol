@@ -12,33 +12,30 @@ import { TakerTraitsLib } from "../src/libs/TakerTraits.sol";
 import { AquaExitTermArgsBuilder } from "../src/instructions/AquaExitTerm.sol";
 import { ZubiDubiExitReceipt } from "../src/ZubiDubiExitReceipt.sol";
 import { ZubiDubiDemoTaker } from "../src/ZubiDubiDemoTaker.sol";
+import { ZubiDubiConfig } from "./ZubiDubiConfig.sol";
 
 contract RunZubiDubiSepoliaDemo is Script {
-    uint256 private constant SEPOLIA_CHAIN_ID = 11_155_111;
-
-    address private constant AQUA = 0xf2A123D6a9Be099283b836EB5D74c08a3F3e013e;
-    address private constant ROUTER = 0x6BeA330Bd4Ca9B631B2f935C30047C76EC2DAb99;
-    address private constant EXIT_RECEIPT = 0x23F341b571434cD17b1232703Cd41569C58106EB;
-    address private constant SEPOLIA_USDC = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238;
-    address private constant SEPOLIA_CHAINLINK_ETH_USD = 0x694AA1769357215DE4FAC081bf1f309aDC325306;
-
     uint8 private constant OP_AQUA_EXIT_TERM_SWAP_1D = 0x22;
     uint256 private constant RECEIPT_CAPACITY = 1 ether;
     uint256 private constant USDC_LIQUIDITY = 100e6;
     uint256 private constant RECEIPT_TO_SELL = 0.001 ether;
 
     function run() external {
-        require(block.chainid == SEPOLIA_CHAIN_ID, "RunZubiDubiSepoliaDemo: wrong chain");
+        ZubiDubiConfig.NetworkConfig memory config = ZubiDubiConfig.sepolia();
+        ZubiDubiConfig.TokenConfig memory receiptAsset = ZubiDubiConfig.sepoliaReceiptAsset();
+        ZubiDubiConfig.TokenConfig memory quoteAsset = ZubiDubiConfig.sepoliaQuoteAsset();
+
+        require(block.chainid == config.chainId, "RunZubiDubiSepoliaDemo: wrong chain");
 
         uint256 deployerPk = vm.envUint("SEPOLIA_PRIVATE_KEY");
         address maker = vm.addr(deployerPk);
 
-        Aqua aqua = Aqua(AQUA);
-        AquaSwapVMRouter router = AquaSwapVMRouter(payable(ROUTER));
-        ZubiDubiExitReceipt receipt = ZubiDubiExitReceipt(EXIT_RECEIPT);
-        IERC20 usdc = IERC20(SEPOLIA_USDC);
+        Aqua aqua = Aqua(config.aqua);
+        AquaSwapVMRouter router = AquaSwapVMRouter(payable(config.aquaSwapVMRouter));
+        ZubiDubiExitReceipt receipt = ZubiDubiExitReceipt(config.exitReceipt);
+        IERC20 usdc = IERC20(config.usdc);
 
-        bytes memory program = _program();
+        bytes memory program = _program(receiptAsset, quoteAsset);
         ISwapVM.Order memory order = _order(maker, program);
         bytes32 orderHash = router.hash(order);
 
@@ -50,11 +47,11 @@ contract RunZubiDubiSepoliaDemo is Script {
         usdc.approve(address(aqua), type(uint256).max);
 
         address[] memory tokens = new address[](2);
-        tokens[0] = EXIT_RECEIPT;
-        tokens[1] = SEPOLIA_USDC;
+        tokens[0] = receiptAsset.token;
+        tokens[1] = quoteAsset.token;
 
         uint256[] memory amounts = new uint256[](2);
-        amounts[0] = RECEIPT_CAPACITY;
+        amounts[0] = 0;
         amounts[1] = USDC_LIQUIDITY;
 
         bytes32 shippedHash = aqua.ship(address(router), abi.encode(order), tokens, amounts);
@@ -66,8 +63,8 @@ contract RunZubiDubiSepoliaDemo is Script {
 
         (, uint256 quotedOut,) = ISwapVM(address(router)).quote(
             order,
-            EXIT_RECEIPT,
-            SEPOLIA_USDC,
+            receiptAsset.token,
+            quoteAsset.token,
             RECEIPT_TO_SELL,
             takerData
         );
@@ -80,8 +77,8 @@ contract RunZubiDubiSepoliaDemo is Script {
 
         (uint256 amountIn, uint256 amountOut,) = taker.swap(
             order,
-            EXIT_RECEIPT,
-            SEPOLIA_USDC,
+            receiptAsset.token,
+            quoteAsset.token,
             RECEIPT_TO_SELL,
             takerData
         );
@@ -106,19 +103,24 @@ contract RunZubiDubiSepoliaDemo is Script {
         console2.log("Taker receipt after:", takerReceiptAfter);
     }
 
-    function _program() private view returns (bytes memory) {
+    function _program(
+        ZubiDubiConfig.TokenConfig memory receiptAsset,
+        ZubiDubiConfig.TokenConfig memory quoteAsset
+    ) private view returns (bytes memory) {
         return bytes.concat(
-            abi.encodePacked(OP_AQUA_EXIT_TERM_SWAP_1D, uint8(44)),
+            abi.encodePacked(OP_AQUA_EXIT_TERM_SWAP_1D, uint8(64)),
             AquaExitTermArgsBuilder.build({
                 baseDiscountBps: 100,
                 annualRateBps: 1_200,
                 maxDiscountBps: 300,
                 maturity: uint40(block.timestamp + 30 days),
                 maxStaleness: 2 days,
-                tokenInDecimals: 18,
-                tokenOutDecimals: 6,
-                oracleDecimals: 8,
-                oracleAddress: SEPOLIA_CHAINLINK_ETH_USD
+                tokenInDecimals: receiptAsset.decimals,
+                tokenOutDecimals: quoteAsset.decimals,
+                oracleDecimals: receiptAsset.priceFeedDecimals,
+                oracleAddress: receiptAsset.priceFeed,
+                maxExposure: 0.01 ether,
+                inventorySlopeBps: 0
             })
         );
     }
