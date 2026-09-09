@@ -1,0 +1,137 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "tasksRunnerOptions": {
+    "default": {
+      "runner": "nx/tasks-runners/default",
+      "options": {
+        "cacheableOperations": [
+          "build",
+          "lint",
+          "test",
+          "e2e"
+        ],
+        "parallel": 3
+      }
+    }
+  },
+  "targetDefaults": {
+    "build": {
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "production"
+      ],
+      "outputs": [
+        "{projectRoot}/dist"
+      ]
+    },
+    "test": {
+      "inputs": [
+        "default",
+        "production",
+        "{workspaceRoot}/typescript/vitest.preset.mjs",
+        "{projectRoot}/vitest.config.[m]{j,t}s"
+      ]
+    },
+    "lint": {
+      "inputs": [
+        "default",
+        "{workspaceRoot}/typescript/eslint.config.mjs"
+      ]
+    },
+    "type-check": {
+      "dependsOn": [
+        "^build"
+      ]
+    },
+    "test:e2e": {
+      "inputs": [
+        "default",
+        "production"
+      ],
+      "dependsOn": [
+        "^build"
+      ]
+    }
+  },
+  "namedInputs": {
+    "sharedGlobals": [
+      "{workspaceRoot}/.github/workflows/*"
+    ],
+    "default": [
+      "{projectRoot}/**/*",
+      "sharedGlobals"
+    ],
+    "production": [
+      "default",
+      "!{projectRoot}/**/?(*.)+(spec|test).[jt]s?(x)?(.snap)",
+      "!{projectRoot}/tsconfig.spec.json",
+      "!{projectRoot}/vitest.config.[jt]s",
+      "!{projectRoot}/.eslintrc.json",
+      "!{projectRoot}/**/*.md"
+    ]
+  },
+  "workspaceLayout": {
+    "libsDir": "typescript",
+    "appsDir": "typescript"
+  },
+  "cli": {
+    "defaultCollection": "@nx/js",
+    "packageManager": "pnpm",
+    "analytics": false
+  },
+  "affected": {
+    "defaultBase": "master"
+  },
+  "generators": {
+    "@nx/js": {
+      "library": {
+        "buildable": true
+      }
+    }
+  },
+  "tui": {
+    "enabled": false
+  },
+  "plugins": [
+    {
+      "plugin": "@nx/vitest",
+      "options": {
+        "targetName": "test"
+      }
+    }
+  ],
+  "release": {
+    "changelog": {
+      "projectChangelogs": {
+        "file": false,
+        "createRelease": "github"
+      },
+      "automaticFromRef": true
+    },
+    "version": {
+      "updateDependents": "never",
+      "logUnchangedProjects": true
+    },
+    "git": {
+      "commit": true,
+      "commitMessage": "chore(release): {version}",
+      "tag": true,
+      "push": true,
+      "stageChanges": true
+    },
+    "groups": {
+      "typescript": {
+        "projects": [
+          "typescript/*"
+        ],
+        "projectsRelationship": "independent"
+      }
+    },
+    "releaseTag": {
+      "pattern": "{projectName}/v{version}"
+    }
+  },
+  "analytics": false
+}

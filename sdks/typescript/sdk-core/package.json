@@ -1,0 +1,71 @@
+{
+  "name": "@1inch/sdk-core",
+  "version": "0.1.3",
+  "description": "Core utilities and types for 1inch SDKs",
+  "author": "@1inch",
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@github.com:1inch/sdks.git"
+  },
+  "homepage": "https://github.com/1inch/sdks#readme",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./test-utils": {
+      "types": "./dist/test-utils/index.d.ts",
+      "import": "./dist/test-utils/index.mjs",
+      "require": "./dist/test-utils/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    "package.json"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsdown",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "type-check": "tsc --noEmit",
+    "clean": "rimraf dist node_modules",
+    "changelog:generate": "changelog generate -a"
+  },
+  "dependencies": {
+    "@1inch/byte-utils": "^3.1.7",
+    "tslib": "^2.8.1",
+    "viem": "^2.48.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.17",
+    "tsdown": "^0.16.8",
+    "typescript": "^5.9.3",
+    "vitest": "4.1.0"
+  },
+  "volta": {
+    "node": "22.13.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "assert": "*"
+  },
+  "peerDependenciesMeta": {
+    "assert": {
+      "optional": true
+    }
+  }
+}

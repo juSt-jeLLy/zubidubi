@@ -1,0 +1,55 @@
+name: PR validation
+
+on:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Need full history for affected commands
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install Dependencies
+        run: pnpm install
+
+      - name: Build contracts
+        run: pnpm build:contracts
+
+      - name: Build packages
+        run: pnpm affected:build --base=origin/${{ github.base_ref }}
+
+      - name: Lint affected packages
+        run: pnpm affected:lint --base=origin/${{ github.base_ref }}
+
+      - name: Type Check all packages
+        run: pnpm lint:types
+
+      - name: Test affected packages
+        run: pnpm affected:test --base=origin/${{ github.base_ref }}
+
+  dependabot-audit:
+    uses: 1inch/workflows/.github/workflows/trivy-scan.yaml@trivy-scan-v1
+    permissions:
+      contents: read
+      actions: read
+      packages: read
+      security-events: write
+    with:
+      severity: 'CRITICAL'
+      limit-severities-for-sarif: false
+      skip-files: '.npmrc'

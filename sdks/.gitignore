@@ -1,0 +1,65 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+.zed
+
+# System
+.DS_Store
+Thumbs.db
+
+# NX
+typescript/.nx/*
+typescript/.nx/cache
+typescript/.nx/workspace-data
+*-graph.html
+.nx/cache
+.nx/workspace-data
+*-graph.html
+static/
+
+# Build outputs
+dist
+build
+*.egg-info
+__pycache__
+*.pyc
+.pytest_cache
+target
+*.class
+*.jar
+cache
+*.tsbuildinfo
+
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Testing
+coverage
+.nyc_output
+junit.xml
+
+# Environment
+.env
+.env.local
+.env.act
+*.env
+
+# Temporary files
+tmp
+temp
+.tmp
+
+# Documentation build
+docs/_build
+
+# Npm
+.npmrc

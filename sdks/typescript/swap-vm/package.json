@@ -1,0 +1,72 @@
+{
+  "name": "@1inch/swap-vm-sdk",
+  "version": "0.4.1",
+  "description": "1inch Swap VM SDK",
+  "author": "@1inch",
+  "license": "LicenseRef-Degensoft-SwapVM-1.1",
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@github.com:1inch/sdks.git"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    "package.json"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsdown",
+    "test": "vitest run",
+    "test:e2e": "vitest run --config vitest.e2e.config.mts",
+    "test:watch": "vitest watch",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "type-check": "tsc --noEmit",
+    "clean": "rimraf dist node_modules",
+    "changelog:generate": "changelog generate -a"
+  },
+  "keywords": [
+    "1inch",
+    "swap-vm",
+    "sdk",
+    "defi",
+    "swap",
+    "virtual-machine"
+  ],
+  "peerDependencies": {
+    "viem": "^2.21.0"
+  },
+  "dependencies": {
+    "@1inch/byte-utils": "^3.1.7",
+    "@1inch/sdk-core": "workspace:*",
+    "tslib": "^2.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.17",
+    "dotenv": "17.2.3",
+    "eslint-plugin-license-header": "0.9.0",
+    "tsdown": "^0.2.17",
+    "typescript": "^5.9.3",
+    "vitest": "4.1.0"
+  },
+  "volta": {
+    "node": "22.13.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,14 @@
+# Configuration for act (GitHub Actions local runner)
+# https://github.com/nektos/act
+
+# Default runner image
+-P ubuntu-latest=node:22
+
+# Reuse containers for better performance
+--reuse
+
+# Use local .env file for secrets (create .env.act for testing)
+--env-file .env.act
+
+# Verbose output for debugging
+# --verbose
