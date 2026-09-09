@@ -1,0 +1,13 @@
+[submodule "aqua"]
+	path = aqua
+	url = https://github.com/1inch/aqua.git
+	branch = main
+
+[submodule "swap-vm"]
+	path = swap-vm
+	url = https://github.com/1inch/swap-vm.git
+	branch = release/1.0.2
+
+[submodule "sdks"]
+	path = sdks
+	url = https://github.com/1inch/sdks.git

@@ -1,0 +1,28 @@
+# Ignore generated dependencies and local machine files across the workspace.
+node_modules/
+package-lock.json
+.yarn-cache/
+
+# Contract/tooling outputs
+out/
+cache/
+coverage/
+deployments/
+broadcast/
+.forge-snapshots/
+.gas-snapshot
+
+# SDK/build outputs
+dist/
+.nx/
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# OS/editor noise
+.DS_Store
+.idea/
+.vscode/
+*.log
