@@ -11,6 +11,7 @@ import * as decay from '../instructions/decay'
 import * as fee from '../instructions/fee'
 import * as debug from '../instructions/debug/opcodes'
 import * as peggedSwap from '../instructions/pegged-swap'
+import * as aquaExitTerm from '../instructions/aqua-exit-term'
 
 export class AquaProgramBuilder extends ProgramBuilder {
   constructor() {
@@ -234,6 +235,29 @@ export class AquaProgramBuilder extends ProgramBuilder {
     super.add(
       fee.aquaDynamicProtocolFeeAmountInXD.createIx(
         new fee.DynamicProtocolFeeArgs(data.feeProvider),
+      ),
+    )
+
+    return this
+  }
+
+  /**
+   * Prices a delayed-redemption exit using a term-discount curve
+   **/
+  public aquaExitTermSwap1D(data: DataFor<aquaExitTerm.AquaExitTermArgs>): this {
+    super.add(
+      aquaExitTerm.aquaExitTermSwap1D.createIx(
+        new aquaExitTerm.AquaExitTermArgs(
+          data.baseDiscountBps,
+          data.annualRateBps,
+          data.maxDiscountBps,
+          data.maturity,
+          data.maxStaleness,
+          data.tokenInDecimals,
+          data.tokenOutDecimals,
+          data.oracleDecimals,
+          data.oracleAddress,
+        ),
       ),
     )
 

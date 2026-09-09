@@ -18,6 +18,7 @@ import * as extruction from './extruction'
 import type { Opcode } from './opcode'
 import type { IArgsData } from './types'
 import * as peggedSwap from './pegged-swap'
+import * as aquaExitTerm from './aqua-exit-term'
 
 export * from './types'
 export { bigintSqrt, truncateHumanDecimalString } from './utils'
@@ -38,6 +39,7 @@ export * as stableSwap from './pegged-swap'
 export * as fee from './fee'
 export * as extruction from './extruction'
 export * as peggedSwap from './pegged-swap'
+export * as aquaExitTerm from './aqua-exit-term'
 
 /**
  * Regular opcodes array - matching SwapVM contract exactly (44 opcodes)
@@ -112,8 +114,7 @@ export const _allInstructions: Opcode<IArgsData>[] = [
 ] as const
 
 /**
- * Aqua opcodes array - matching AquaSwapVM contract (29 opcodes)
- * @see https://github.com/1inch/swap-vm/blob/main/src/opcodes/AquaOpcodes.sol#L28
+ * Aqua opcodes array - matching the local ZubiDubi AquaSwapVMRouter opcode table.
  */
 export const aquaInstructions: Opcode<IArgsData>[] = [
   /**
@@ -161,4 +162,5 @@ export const aquaInstructions: Opcode<IArgsData>[] = [
   peggedSwap.peggedSwapGrowPriceRange2D, // 32
   extruction.extruction, // 33
   controls.onlyTxOriginTokenBalanceNonZero, // 34
+  aquaExitTerm.aquaExitTermSwap1D, // 35
 ] as const

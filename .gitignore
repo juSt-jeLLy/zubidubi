@@ -9,6 +9,9 @@ out/
 cache/
 coverage/
 deployments/
+!swap-vm/deployments/
+!swap-vm/deployments/sepolia/
+!swap-vm/deployments/sepolia/ZubiDubi.json
 broadcast/
 .forge-snapshots/
 .gas-snapshot
