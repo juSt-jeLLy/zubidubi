@@ -5,10 +5,12 @@
   "scripts": {
     "codegen": "graph codegen",
     "build": "graph build",
-    "deploy:studio": "graph deploy ${SUBGRAPH_SLUG:-zubidubi} --studio"
+    "deploy:studio": "graph deploy ${SUBGRAPH_SLUG:-zubidubi} subgraph.yaml --version-label ${SUBGRAPH_VERSION:-v0.1.0}",
+    "query:live": "node scripts/query-live.mjs"
   },
   "devDependencies": {
     "@graphprotocol/graph-cli": "^0.97.1",
-    "@graphprotocol/graph-ts": "^0.38.0"
+    "@graphprotocol/graph-ts": "^0.38.0",
+    "dotenv": "^16.4.7"
   }
 }

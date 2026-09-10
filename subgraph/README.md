@@ -20,8 +20,20 @@ npm run build
 To deploy to Subgraph Studio:
 
 ```bash
-npx graph auth --studio <DEPLOY_KEY>
+npx graph auth <DEPLOY_KEY>
 npm run deploy:studio
+```
+
+Live Studio endpoint:
+
+```text
+https://api.studio.thegraph.com/query/1760034/zubidubi/v0.1.0
+```
+
+Run a live provider query:
+
+```bash
+npm run query:live
 ```
 
 ## Live Sepolia Contracts
@@ -41,3 +53,11 @@ npm run deploy:studio
 - Routed Sepolia demo final sell transaction: `0xca274ac4f8904d06674eca90c681a3d1338766aa3d74a7fa64df67001d85827c`
 
 The routed demo sold `0.003 zbETH` and paid `7.243334 USDC` net to the seller.
+
+## Where This Improves ZubiDubi
+
+- Solver discovery: query active `zubiDubiStrategies` instead of scanning Aqua logs live.
+- Routing quality: sort makers by exposure, available virtual quote balance, and recent fill history.
+- Risk dashboard: show which makers are accumulating too much receipt exposure.
+- DAO revenue: query `cumulativeProtocolSideRevenue` and `routeFees` for revenue-share proof.
+- Demo story: show the same live query pattern powering solver, analytics, and frontend.
