@@ -21,6 +21,7 @@ dist/
 .nx/
 subgraph/build/
 subgraph/generated/
+substreams/**/target/
 
 # Local secrets
 .env

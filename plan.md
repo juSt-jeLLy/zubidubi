@@ -573,12 +573,13 @@ Completed so far:
 - Graph-backed solver quote validated against live Sepolia: it found 3 indexed strategies and quoted a 0.003 zbETH exit through `ZubiDubiRouteExecutor` using Graph-discovered order data.
 - Upgraded Graph layer to `v0.2.1` with a solver-grade market book, per-route maker fills, execution price history, strategy snapshots, market-level volume, market-level exposure, and market-level DAO fee accrual.
 - Deployed the upgraded Subgraph Studio version at `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.2.1` and validated live queries against real Sepolia events.
+- Added reusable Aqua Liquidity Substreams package at `substreams/aqua-liquidity`; it extracts standardized Aqua `SHIPPED`, `PUSHED`, `PULLED`, and `DOCKED` events from EVM blocks, compiles with `cargo check`, and builds successfully to `wasm32-unknown-unknown`.
 
 Next build targets:
 
 - Add optional execution mode to the Graph-backed solver so it can submit the routed exit after quoting.
 - Add a frontend that uses the same Graph solver data for market discovery, route preview, risk panels, fee analytics, and live fill history.
-- Add a reusable Aqua Substreams module for standardized shared-liquidity balance deltas if we want the strongest possible Graph bounty angle.
+- Install the Substreams CLI and run the Aqua Liquidity Substreams module against a live The Graph Market or Pinax endpoint for the strongest possible Graph bounty demo.
 
 ## Graph layer: winner-level positioning
 
@@ -592,6 +593,7 @@ ZubiDubi now follows that pattern:
 - `StrategySnapshot` creates a position timeline across ship, push, pull, swap, and dock events.
 - `MakerExposure` lets the solver and UI show concentration risk and inventory pressure.
 - `RouteFee` and market fee rollups prove DAO revenue from real fills.
+- `substreams/aqua-liquidity` provides a reusable Substreams extractor for the same Aqua lifecycle events, giving the project a credible Substreams + Subgraph composition path.
 
 What this fixes:
 
@@ -604,7 +606,7 @@ What still separates us from the most complete winners:
 - No polished frontend yet.
 - No public solver API endpoint yet.
 - No MCP endpoint yet.
-- No Substreams module yet.
+- Substreams module exists and builds to WASM, but has not yet been packaged/run through a live Substreams provider in this repo.
 
 These are product-surface gaps, not core protocol gaps. The protocol, live deployment, and Graph-backed market reconstruction are now in place.
 

@@ -52,11 +52,11 @@ Compared to a basic event indexer, this gives ZubiDubi the same category of data
 
 ## Future Substreams Upgrade
 
-If we want to strengthen the Graph bounty further, the natural next step is a reusable Substreams module for Aqua-style shared-liquidity flows:
+The repo now includes `substreams/aqua-liquidity`, a reusable Substreams module for Aqua-style shared-liquidity flows:
 
 - detect `Shipped`
 - track virtual token balances from `Pushed`/`Pulled`
 - emit normalized strategy balance deltas
 - reuse the same module across chains and across any Aqua app
 
-That would compose Substreams with this Subgraph, but the current implementation already satisfies the standardized-schema path and consumes live Studio data.
+That composes Substreams with this Subgraph: Substreams is the reusable extraction layer, and the subgraph is the ZubiDubi market-book/query layer. The current live deployed subgraph already satisfies the live provider path; the next step is to package and run the Substreams module through a live provider endpoint for an even stronger demo.

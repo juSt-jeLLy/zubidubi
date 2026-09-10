@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "zubidubi:graph-quote": "node scripts/zubidubi-graph-solver.mjs"
+    "zubidubi:graph-quote": "node scripts/zubidubi-graph-solver.mjs",
+    "zubidubi:substreams:check": "cargo check --manifest-path substreams/aqua-liquidity/Cargo.toml"
   },
   "keywords": [],
   "author": "",

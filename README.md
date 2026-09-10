@@ -35,6 +35,21 @@ The upgraded subgraph also reconstructs a solver-grade market book:
 - `StrategySnapshot`: strategy state timeline across ship, push, pull, swap, and dock events.
 - `MakerExposure`: maker inventory pressure for routing and risk views.
 
+## Substreams Module
+
+```bash
+npm run zubidubi:substreams:check
+```
+
+`substreams/aqua-liquidity` is a reusable Aqua shared-liquidity extractor. It streams standardized Aqua lifecycle deltas:
+
+- `SHIPPED`
+- `PUSHED`
+- `PULLED`
+- `DOCKED`
+
+This is the Graph-composability upgrade path: Substreams handles fast cross-chain extraction of Aqua balance/strategy deltas, and the deployed subgraph turns those deltas into the ZubiDubi market book used by the solver and frontend.
+
 ## Current Proof
 
 - Real routed Sepolia fill: `0xca274ac4f8904d06674eca90c681a3d1338766aa3d74a7fa64df67001d85827c`

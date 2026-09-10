@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package zubidubi.aqua.v1;
+
+message AquaLiquidityEvents {
+  repeated AquaLiquidityEvent events = 1;
+}
+
+message AquaLiquidityEvent {
+  string event_id = 1;
+  string event_type = 2;
+  string maker = 3;
+  string app = 4;
+  string strategy_hash = 5;
+  string token = 6;
+  string amount = 7;
+  string strategy_data = 8;
+  uint64 block_number = 9;
+  uint64 log_index = 10;
+  string transaction_hash = 11;
+}

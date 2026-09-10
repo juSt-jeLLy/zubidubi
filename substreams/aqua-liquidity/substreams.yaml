@@ -1,0 +1,27 @@
+specVersion: v0.1.0
+package:
+  name: zubidubi_aqua_liquidity
+  version: v0.1.0
+  url: https://github.com/juSt-jeLLy/zubidubi
+  doc: |
+    Reusable Aqua shared-liquidity event extractor for ZubiDubi and future Aqua apps.
+
+protobuf:
+  files:
+    - zubidubi/aqua/v1/aqua.proto
+  importPaths:
+    - ./proto
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./target/wasm32-unknown-unknown/release/zubidubi_aqua_liquidity_substreams.wasm
+
+modules:
+  - name: map_aqua_liquidity_events
+    kind: map
+    initialBlock: 11671900
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+    output:
+      type: proto:zubidubi.aqua.v1.AquaLiquidityEvents
