@@ -1,5 +1,5 @@
 import { Address, BigInt, Bytes, ethereum } from '@graphprotocol/graph-ts'
-import { Account, Protocol, StrategyBalance, Token, ZubiDubiStrategy } from '../generated/schema'
+import { Account, Market, Protocol, StrategyBalance, StrategySnapshot, Token, ZubiDubiStrategy } from '../generated/schema'
 import { ZubiDubiExitReceipt } from '../generated/ZubiDubiExitReceipt/ZubiDubiExitReceipt'
 import { ONE_BI, PROTOCOL_ID, USDC, ZERO_BI } from './constants'
 
@@ -9,6 +9,10 @@ export function eventId(event: ethereum.Event): string {
 
 export function strategyId(maker: Address, app: Address, strategyHash: Bytes): string {
   return maker.toHexString() + '-' + app.toHexString() + '-' + strategyHash.toHexString()
+}
+
+export function marketId(receiptToken: string, quoteToken: string): string {
+  return receiptToken + '-' + quoteToken
 }
 
 export function balanceId(strategy: ZubiDubiStrategy, token: Address): string {
@@ -27,7 +31,7 @@ export function loadProtocol(event: ethereum.Event): Protocol {
     protocol.slug = 'zubidubi'
     protocol.network = 'sepolia'
     protocol.schemaVersion = '1.0.2-compatible'
-    protocol.subgraphVersion = '0.1.0'
+    protocol.subgraphVersion = '0.2.1'
     protocol.methodologyVersion = '0.1.0'
     protocol.cumulativeStrategyCount = ZERO_BI
     protocol.cumulativeSwapCount = ZERO_BI
@@ -74,6 +78,30 @@ export function loadToken(address: Address): Token {
   return token
 }
 
+export function loadMarket(receiptToken: Token, quoteToken: Token, event: ethereum.Event): Market {
+  let id = marketId(receiptToken.id, quoteToken.id)
+  let market = Market.load(id)
+  if (market == null) {
+    market = new Market(id)
+    market.receiptToken = receiptToken.id
+    market.quoteToken = quoteToken.id
+    market.totalStrategyCount = ZERO_BI
+    market.activeStrategyCount = ZERO_BI
+    market.totalVirtualReceipt = ZERO_BI
+    market.totalVirtualQuote = ZERO_BI
+    market.totalReceiptExposure = ZERO_BI
+    market.totalQuotePulled = ZERO_BI
+    market.swapCount = ZERO_BI
+    market.routeCount = ZERO_BI
+    market.cumulativeVolumeIn = ZERO_BI
+    market.cumulativeVolumeOut = ZERO_BI
+    market.cumulativeProtocolSideRevenue = ZERO_BI
+  }
+  market.lastUpdatedBlock = event.block.number
+  market.lastUpdatedTimestamp = event.block.timestamp
+  return market
+}
+
 export function loadStrategy(maker: Address, app: Address, strategyHash: Bytes, event: ethereum.Event): ZubiDubiStrategy {
   let id = strategyId(maker, app, strategyHash)
   let strategy = ZubiDubiStrategy.load(id)
@@ -82,6 +110,7 @@ export function loadStrategy(maker: Address, app: Address, strategyHash: Bytes, 
     strategy.maker = loadAccount(maker, event).id
     strategy.app = app
     strategy.orderHash = strategyHash
+    strategy.market = null
     strategy.strategyData = Bytes.empty()
     strategy.status = 'ACTIVE'
     strategy.receiptVirtualBalance = ZERO_BI
@@ -94,6 +123,42 @@ export function loadStrategy(maker: Address, app: Address, strategyHash: Bytes, 
   strategy.updatedAtBlock = event.block.number
   strategy.updatedAtTimestamp = event.block.timestamp
   return strategy
+}
+
+export function attachStrategyMarket(strategy: ZubiDubiStrategy, event: ethereum.Event): void {
+  if (strategy.market != null || strategy.receiptToken == null || strategy.quoteToken == null) return
+
+  let receiptToken = Token.load(strategy.receiptToken!)
+  let quoteToken = Token.load(strategy.quoteToken!)
+  if (receiptToken == null || quoteToken == null) return
+
+  let market = loadMarket(receiptToken, quoteToken, event)
+  market.totalStrategyCount = market.totalStrategyCount.plus(ONE_BI)
+  market.activeStrategyCount = market.activeStrategyCount.plus(ONE_BI)
+  market.totalVirtualReceipt = market.totalVirtualReceipt.plus(strategy.receiptVirtualBalance)
+  market.totalVirtualQuote = market.totalVirtualQuote.plus(strategy.quoteVirtualBalance)
+  market.totalReceiptExposure = market.totalReceiptExposure.plus(strategy.exposureAmount)
+  market.totalQuotePulled = market.totalQuotePulled.plus(strategy.quotePulledAmount)
+  market.save()
+
+  strategy.market = market.id
+}
+
+export function snapshotStrategy(strategy: ZubiDubiStrategy, reason: string, event: ethereum.Event): void {
+  let snapshot = new StrategySnapshot(eventId(event) + '-' + reason)
+  snapshot.strategy = strategy.id
+  snapshot.market = strategy.market
+  snapshot.receiptVirtualBalance = strategy.receiptVirtualBalance
+  snapshot.quoteVirtualBalance = strategy.quoteVirtualBalance
+  snapshot.exposureAmount = strategy.exposureAmount
+  snapshot.quotePulledAmount = strategy.quotePulledAmount
+  snapshot.status = strategy.status
+  snapshot.reason = reason
+  snapshot.blockNumber = event.block.number
+  snapshot.timestamp = event.block.timestamp
+  snapshot.transactionHash = event.transaction.hash
+  snapshot.logIndex = event.logIndex
+  snapshot.save()
 }
 
 export function loadStrategyBalance(strategy: ZubiDubiStrategy, tokenAddress: Address, event: ethereum.Event): StrategyBalance {
@@ -128,4 +193,3 @@ export function decimalsFor(address: Address): i32 {
   if (!decimals.reverted) return decimals.value
   return 18
 }
-

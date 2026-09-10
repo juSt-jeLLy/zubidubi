@@ -2,9 +2,25 @@ import 'dotenv/config'
 
 const endpoint =
   process.env.ZUBIDUBI_SUBGRAPH_ENDPOINT ||
-  'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.1.0'
+  'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.2.1'
 
 const query = `{
+  markets(first: 10, orderBy: cumulativeVolumeOut, orderDirection: desc) {
+    id
+    receiptToken { symbol decimals }
+    quoteToken { symbol decimals }
+    totalStrategyCount
+    activeStrategyCount
+    totalVirtualReceipt
+    totalVirtualQuote
+    totalReceiptExposure
+    totalQuotePulled
+    swapCount
+    routeCount
+    cumulativeVolumeIn
+    cumulativeVolumeOut
+    cumulativeProtocolSideRevenue
+  }
   protocol(id: "zubidubi-sepolia") {
     cumulativeStrategyCount
     cumulativeSwapCount
@@ -16,6 +32,7 @@ const query = `{
   zubiDubiStrategies(first: 10, orderBy: updatedAtTimestamp, orderDirection: desc) {
     id
     orderHash
+    market { id }
     strategyData
     status
     maker { id }
@@ -26,10 +43,19 @@ const query = `{
     exposureAmount
   }
   routeFees(first: 5, orderBy: timestamp, orderDirection: desc) {
+    market { id }
     amount
     token { symbol }
     feeRecipient { id }
     transactionHash
+  }
+  routeFills(first: 10, orderBy: timestamp, orderDirection: desc) {
+    market { id }
+    maker { id }
+    amountIn
+    amountOut
+    executionPriceE18
+    routeTransactionHash
   }
 }`
 

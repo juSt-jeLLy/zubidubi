@@ -1,6 +1,6 @@
-import { MakerSkip, Route, RouteFee } from '../generated/schema'
+import { MakerSkip, Route, RouteFee, RouteFeeAccrual } from '../generated/schema'
 import { ZubiDubiMakerSkipped, ZubiDubiRouteFeePaid, ZubiDubiRouteFilled } from '../generated/ZubiDubiRouteExecutor/ZubiDubiRouteExecutor'
-import { eventId, loadAccount, loadProtocol, loadToken } from './entities'
+import { eventId, loadAccount, loadMarket, loadProtocol, loadToken } from './entities'
 import { ONE_BI, ZERO_BI } from './constants'
 
 export function handleRouteFilled(event: ZubiDubiRouteFilled): void {
@@ -18,17 +18,37 @@ export function handleRouteFilled(event: ZubiDubiRouteFilled): void {
   let route = new Route(eventId(event))
   route.taker = taker.id
   route.recipient = recipient.id
-  route.tokenIn = loadToken(event.params.tokenIn).id
-  route.tokenOut = loadToken(event.params.tokenOut).id
+  let tokenIn = loadToken(event.params.tokenIn)
+  let tokenOut = loadToken(event.params.tokenOut)
+  let market = loadMarket(tokenIn, tokenOut, event)
+  market.routeCount = market.routeCount.plus(ONE_BI)
+  let accrual = RouteFeeAccrual.load(event.transaction.hash.toHexString())
+  if (accrual != null) {
+    market.cumulativeProtocolSideRevenue = market.cumulativeProtocolSideRevenue.plus(accrual.amount)
+  }
+  market.save()
+
+  route.market = market.id
+  route.tokenIn = tokenIn.id
+  route.tokenOut = tokenOut.id
   route.amountIn = event.params.amountIn
   route.netAmountOut = event.params.amountOut
   route.fills = event.params.fills
-  route.feeAmount = ZERO_BI
+  route.feeAmount = accrual == null ? ZERO_BI : accrual.amount
   route.blockNumber = event.block.number
   route.timestamp = event.block.timestamp
   route.transactionHash = event.transaction.hash
   route.logIndex = event.logIndex
   route.save()
+
+  if (accrual != null) {
+    let fee = RouteFee.load(accrual.routeFee)
+    if (fee != null) {
+      fee.market = market.id
+      fee.save()
+    }
+    accrual.save()
+  }
 }
 
 export function handleRouteFeePaid(event: ZubiDubiRouteFeePaid): void {
@@ -39,15 +59,24 @@ export function handleRouteFeePaid(event: ZubiDubiRouteFeePaid): void {
   let feeRecipient = loadAccount(event.params.feeRecipient, event)
   feeRecipient.save()
 
+  let tokenOut = loadToken(event.params.tokenOut)
+
   let fee = new RouteFee(eventId(event))
+  fee.market = null
   fee.feeRecipient = feeRecipient.id
-  fee.token = loadToken(event.params.tokenOut).id
+  fee.token = tokenOut.id
   fee.amount = event.params.amount
   fee.transactionHash = event.transaction.hash
   fee.blockNumber = event.block.number
   fee.timestamp = event.block.timestamp
   fee.logIndex = event.logIndex
   fee.save()
+
+  let accrual = new RouteFeeAccrual(event.transaction.hash.toHexString())
+  accrual.routeFee = fee.id
+  accrual.token = tokenOut.id
+  accrual.amount = event.params.amount
+  accrual.save()
 }
 
 export function handleMakerSkipped(event: ZubiDubiMakerSkipped): void {
@@ -63,4 +92,3 @@ export function handleMakerSkipped(event: ZubiDubiMakerSkipped): void {
   skip.logIndex = event.logIndex
   skip.save()
 }
-

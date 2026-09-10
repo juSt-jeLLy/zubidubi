@@ -571,12 +571,42 @@ Completed so far:
 - The Graph subgraph is deployed on Subgraph Studio and indexes Aqua strategies, SwapVM fills, ZubiDubi routes, maker skips, receipt lifecycle, maker exposure, and DAO/protocol fees.
 - Graph-backed solver app script added at `scripts/zubidubi-graph-solver.mjs`; it queries live indexed strategies, decodes executable SwapVM orders, and uses Sepolia RPC for final `quoteExactIn` freshness checks.
 - Graph-backed solver quote validated against live Sepolia: it found 3 indexed strategies and quoted a 0.003 zbETH exit through `ZubiDubiRouteExecutor` using Graph-discovered order data.
+- Upgraded Graph layer to `v0.2.1` with a solver-grade market book, per-route maker fills, execution price history, strategy snapshots, market-level volume, market-level exposure, and market-level DAO fee accrual.
+- Deployed the upgraded Subgraph Studio version at `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.2.1` and validated live queries against real Sepolia events.
 
 Next build targets:
 
 - Add optional execution mode to the Graph-backed solver so it can submit the routed exit after quoting.
 - Add a frontend that uses the same Graph solver data for market discovery, route preview, risk panels, fee analytics, and live fill history.
 - Add a reusable Aqua Substreams module for standardized shared-liquidity balance deltas if we want the strongest possible Graph bounty angle.
+
+## Graph layer: winner-level positioning
+
+Past strong projects did not use indexing as a side dashboard. They used indexing as the market reconstruction layer.
+
+ZubiDubi now follows that pattern:
+
+- `Market` reconstructs the live zbETH/USDC exit-liquidity book across many Aqua strategies.
+- `ZubiDubiStrategy` stores executable SwapVM order bytes so the app/solver can reconstruct routes from indexed data.
+- `RouteFill` creates a fill tape with maker attribution, execution price, and transaction hash.
+- `StrategySnapshot` creates a position timeline across ship, push, pull, swap, and dock events.
+- `MakerExposure` lets the solver and UI show concentration risk and inventory pressure.
+- `RouteFee` and market fee rollups prove DAO revenue from real fills.
+
+What this fixes:
+
+- The solver no longer needs to scan raw Aqua logs to discover strategies.
+- The frontend can show a live market, route tape, maker exposure, and DAO revenue from one query surface.
+- The demo can explain standards leverage clearly: shared entities for protocol/account/token/swap/revenue, with ZubiDubi-specific market and strategy extensions.
+
+What still separates us from the most complete winners:
+
+- No polished frontend yet.
+- No public solver API endpoint yet.
+- No MCP endpoint yet.
+- No Substreams module yet.
+
+These are product-surface gaps, not core protocol gaps. The protocol, live deployment, and Graph-backed market reconstruction are now in place.
 
 ## Test plan
 

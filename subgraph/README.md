@@ -6,6 +6,7 @@ Indexes the ZubiDubi Sepolia deployment:
 - SwapVM fills against Aqua strategies.
 - ZubiDubi routed exits, maker skips, and protocol/DAO fee accrual.
 - Receipt maturity/redemption metadata from the receipt token contract.
+- Market-level liquidity, volume, exposure, route-fill, price, and revenue reconstruction.
 
 This follows The Graph standardized-subgraph design idea: reusable protocol/account/token/swap/revenue-style entities first, with ZubiDubi-specific strategy and maker-exposure entities layered on top.
 
@@ -27,7 +28,7 @@ npm run deploy:studio
 Live Studio endpoint:
 
 ```text
-https://api.studio.thegraph.com/query/1760034/zubidubi/v0.1.0
+https://api.studio.thegraph.com/query/1760034/zubidubi/v0.2.1
 ```
 
 Run a live provider query:
@@ -65,6 +66,9 @@ The routed demo sold `0.003 zbETH` and paid `7.243334 USDC` net to the seller.
 ## Where This Improves ZubiDubi
 
 - Solver discovery: query active `zubiDubiStrategies` instead of scanning Aqua logs live.
+- Market reconstruction: query `markets` to see aggregate active liquidity, exposure, routes, volume, and protocol revenue.
+- Route fill tape: query `routeFills` for maker attribution and execution prices.
+- Position timeline: query `strategySnapshots` for strategy state changes over time.
 - Routing quality: sort makers by exposure, available virtual quote balance, and recent fill history.
 - Risk dashboard: show which makers are accumulating too much receipt exposure.
 - DAO revenue: query `cumulativeProtocolSideRevenue` and `routeFees` for revenue-share proof.

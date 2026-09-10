@@ -1,7 +1,25 @@
 query SolverStrategies {
+  markets(orderBy: cumulativeVolumeOut, orderDirection: desc) {
+    id
+    receiptToken { id symbol decimals }
+    quoteToken { id symbol decimals }
+    totalStrategyCount
+    activeStrategyCount
+    totalVirtualReceipt
+    totalVirtualQuote
+    totalReceiptExposure
+    totalQuotePulled
+    swapCount
+    routeCount
+    cumulativeVolumeIn
+    cumulativeVolumeOut
+    cumulativeProtocolSideRevenue
+    lastUpdatedTimestamp
+  }
   zubiDubiStrategies(where: { status: ACTIVE }, orderBy: updatedAtTimestamp, orderDirection: desc) {
     id
     orderHash
+    market { id }
     strategyData
     maker { id }
     receiptToken { id symbol decimals }
@@ -11,6 +29,47 @@ query SolverStrategies {
     exposureAmount
     quotePulledAmount
     updatedAtTimestamp
+  }
+}
+
+query RouteTape {
+  routeFills(orderBy: timestamp, orderDirection: desc) {
+    id
+    routeTransactionHash
+    orderHash
+    market { id receiptToken { symbol } quoteToken { symbol } }
+    maker { id }
+    taker { id }
+    amountIn
+    amountOut
+    executionPriceE18
+    timestamp
+  }
+  routes(orderBy: timestamp, orderDirection: desc) {
+    id
+    market { id }
+    amountIn
+    netAmountOut
+    feeAmount
+    fills
+    transactionHash
+    timestamp
+  }
+}
+
+query StrategyTimeline {
+  strategySnapshots(orderBy: timestamp, orderDirection: desc, first: 50) {
+    id
+    strategy { id orderHash maker { id } }
+    market { id }
+    reason
+    status
+    receiptVirtualBalance
+    quoteVirtualBalance
+    exposureAmount
+    quotePulledAmount
+    transactionHash
+    timestamp
   }
 }
 

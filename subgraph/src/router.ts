@@ -1,7 +1,8 @@
-import { MakerExposure, Swap } from '../generated/schema'
+import { BigInt } from '@graphprotocol/graph-ts'
+import { MakerExposure, RouteFill, Swap, Token } from '../generated/schema'
 import { Swapped } from '../generated/AquaSwapVMRouter/AquaSwapVMRouter'
-import { eventId, exposureId, loadAccount, loadProtocol, loadStrategy, loadToken } from './entities'
-import { ONE_BI, ZERO_BI } from './constants'
+import { eventId, exposureId, loadAccount, loadMarket, loadProtocol, loadStrategy, loadToken, snapshotStrategy } from './entities'
+import { ONE_BI, ONE_E18, ZERO_BI } from './constants'
 
 export function handleSwapped(event: Swapped): void {
   let protocol = loadProtocol(event)
@@ -37,6 +38,29 @@ export function handleSwapped(event: Swapped): void {
   swap.logIndex = event.logIndex
   swap.save()
 
+  let fill = new RouteFill(eventId(event))
+  fill.routeTransactionHash = event.transaction.hash
+  fill.orderHash = event.params.orderHash
+  fill.strategy = strategy.id
+  fill.market = strategy.market
+  fill.maker = maker.id
+  fill.taker = taker.id
+  fill.tokenIn = tokenIn.id
+  fill.tokenOut = tokenOut.id
+  fill.amountIn = event.params.amountIn
+  fill.amountOut = event.params.amountOut
+  fill.executionPriceE18 = priceE18(event.params.amountIn, event.params.amountOut, tokenIn, tokenOut)
+  fill.blockNumber = event.block.number
+  fill.timestamp = event.block.timestamp
+  fill.logIndex = event.logIndex
+  fill.save()
+
+  let market = loadMarket(tokenIn, tokenOut, event)
+  market.swapCount = market.swapCount.plus(ONE_BI)
+  market.cumulativeVolumeIn = market.cumulativeVolumeIn.plus(event.params.amountIn)
+  market.cumulativeVolumeOut = market.cumulativeVolumeOut.plus(event.params.amountOut)
+  market.save()
+
   let exposure = MakerExposure.load(exposureId(event.params.maker, event.params.tokenIn))
   if (exposure == null) {
     exposure = new MakerExposure(exposureId(event.params.maker, event.params.tokenIn))
@@ -51,8 +75,13 @@ export function handleSwapped(event: Swapped): void {
   exposure.lastUpdatedTimestamp = event.block.timestamp
   exposure.save()
 
-  strategy.exposureAmount = strategy.exposureAmount.plus(event.params.amountIn)
-  strategy.quotePulledAmount = strategy.quotePulledAmount.plus(event.params.amountOut)
   strategy.save()
+  snapshotStrategy(strategy, 'SWAPPED', event)
 }
 
+function priceE18(amountIn: BigInt, amountOut: BigInt, tokenIn: Token, tokenOut: Token): BigInt {
+  if (amountIn.isZero()) return ZERO_BI
+  let inScale = BigInt.fromI32(10).pow(tokenIn.decimals as u8)
+  let outScale = BigInt.fromI32(10).pow(tokenOut.decimals as u8)
+  return amountOut.times(ONE_E18).times(inScale).div(amountIn).div(outScale)
+}

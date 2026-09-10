@@ -11,7 +11,7 @@ ZubiDubi lets a seller exit a delayed asset such as an LRT withdrawal receipt, P
 - ZubiDubiRouteExecutor: `0x2D1d8B08A810766f702ef29A01b6219964073a8d`
 - ZubiDubiExitReceipt: `0x9c99F37e5Ad3F974eeb5a50F929EEa9fa70D3581`
 - Subgraph Studio: `https://thegraph.com/studio/subgraph/zubidubi`
-- Subgraph endpoint: `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.1.0`
+- Subgraph endpoint: `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.2.1`
 
 ## Graph-Backed Solver
 
@@ -27,6 +27,13 @@ The solver flow is:
 4. Return route preview, maker candidates, skipped makers, and net seller output.
 
 This makes The Graph part of the core app path, not just a dashboard: Graph handles scalable market discovery, while Sepolia contracts handle final balance, allowance, quote, and settlement checks.
+
+The upgraded subgraph also reconstructs a solver-grade market book:
+
+- `Market`: active strategy count, virtual receipt/quote liquidity, exposure, volume, routes, and DAO revenue.
+- `RouteFill`: maker-level fill tape with execution price.
+- `StrategySnapshot`: strategy state timeline across ship, push, pull, swap, and dock events.
+- `MakerExposure`: maker inventory pressure for routing and risk views.
 
 ## Current Proof
 

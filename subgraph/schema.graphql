@@ -34,6 +34,25 @@ type Token @entity(immutable: false) {
   isReceipt: Boolean!
 }
 
+type Market @entity(immutable: false) {
+  id: ID!
+  receiptToken: Token!
+  quoteToken: Token!
+  totalStrategyCount: BigInt!
+  activeStrategyCount: BigInt!
+  totalVirtualReceipt: BigInt!
+  totalVirtualQuote: BigInt!
+  totalReceiptExposure: BigInt!
+  totalQuotePulled: BigInt!
+  swapCount: BigInt!
+  routeCount: BigInt!
+  cumulativeVolumeIn: BigInt!
+  cumulativeVolumeOut: BigInt!
+  cumulativeProtocolSideRevenue: BigInt!
+  lastUpdatedBlock: BigInt!
+  lastUpdatedTimestamp: BigInt!
+}
+
 type ReceiptAsset @entity(immutable: false) {
   id: ID!
   token: Token!
@@ -51,6 +70,7 @@ type ZubiDubiStrategy @entity(immutable: false) {
   maker: Account!
   app: Bytes!
   orderHash: Bytes!
+  market: Market
   strategyData: Bytes!
   status: StrategyStatus!
   receiptToken: Token
@@ -63,6 +83,22 @@ type ZubiDubiStrategy @entity(immutable: false) {
   createdAtTimestamp: BigInt!
   updatedAtBlock: BigInt!
   updatedAtTimestamp: BigInt!
+}
+
+type StrategySnapshot @entity(immutable: true) {
+  id: ID!
+  strategy: ZubiDubiStrategy!
+  market: Market
+  receiptVirtualBalance: BigInt!
+  quoteVirtualBalance: BigInt!
+  exposureAmount: BigInt!
+  quotePulledAmount: BigInt!
+  status: StrategyStatus!
+  reason: SnapshotReason!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+  logIndex: BigInt!
 }
 
 type StrategyBalance @entity(immutable: false) {
@@ -92,8 +128,27 @@ type Swap @entity(immutable: true) {
   logIndex: BigInt!
 }
 
+type RouteFill @entity(immutable: true) {
+  id: ID!
+  routeTransactionHash: Bytes!
+  orderHash: Bytes!
+  strategy: ZubiDubiStrategy
+  market: Market
+  maker: Account!
+  taker: Account!
+  tokenIn: Token!
+  tokenOut: Token!
+  amountIn: BigInt!
+  amountOut: BigInt!
+  executionPriceE18: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  logIndex: BigInt!
+}
+
 type Route @entity(immutable: false) {
   id: ID!
+  market: Market
   taker: Account!
   recipient: Account!
   tokenIn: Token!
@@ -108,8 +163,9 @@ type Route @entity(immutable: false) {
   logIndex: BigInt!
 }
 
-type RouteFee @entity(immutable: true) {
+type RouteFee @entity(immutable: false) {
   id: ID!
+  market: Market
   feeRecipient: Account!
   token: Token!
   amount: BigInt!
@@ -117,6 +173,13 @@ type RouteFee @entity(immutable: true) {
   blockNumber: BigInt!
   timestamp: BigInt!
   logIndex: BigInt!
+}
+
+type RouteFeeAccrual @entity(immutable: false) {
+  id: ID!
+  routeFee: RouteFee!
+  token: Token!
+  amount: BigInt!
 }
 
 type MakerSkip @entity(immutable: true) {
@@ -141,5 +204,13 @@ type MakerExposure @entity(immutable: false) {
 
 enum StrategyStatus {
   ACTIVE
+  DOCKED
+}
+
+enum SnapshotReason {
+  SHIPPED
+  PUSHED
+  PULLED
+  SWAPPED
   DOCKED
 }

@@ -12,7 +12,7 @@ const deployment = JSON.parse(readFileSync(join(root, 'swap-vm/deployments/sepol
 
 const endpoint =
   process.env.ZUBIDUBI_SUBGRAPH_ENDPOINT ||
-  'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.1.0'
+  'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.2.1'
 const rpcUrl = process.env.SEPOLIA_RPC_URL || process.env.RPC_URL
 const tokenIn = normalize(process.env.ZUBIDUBI_TOKEN_IN || deployment.exitReceipt)
 const tokenOut = normalize(process.env.ZUBIDUBI_TOKEN_OUT || deployment.usdc)
@@ -24,6 +24,21 @@ if (!rpcUrl) {
 }
 
 const query = `query SolverStrategies($tokenIn: String!, $tokenOut: String!) {
+  markets(where: { receiptToken: $tokenIn, quoteToken: $tokenOut }) {
+    id
+    totalStrategyCount
+    activeStrategyCount
+    totalVirtualReceipt
+    totalVirtualQuote
+    totalReceiptExposure
+    totalQuotePulled
+    swapCount
+    routeCount
+    cumulativeVolumeIn
+    cumulativeVolumeOut
+    cumulativeProtocolSideRevenue
+    lastUpdatedTimestamp
+  }
   zubiDubiStrategies(
     where: { status: ACTIVE, receiptToken: $tokenIn, quoteToken: $tokenOut }
     orderBy: updatedAtTimestamp
@@ -45,6 +60,7 @@ const query = `query SolverStrategies($tokenIn: String!, $tokenOut: String!) {
 
 const graphData = await graphRequest(endpoint, query, { tokenIn, tokenOut })
 const strategies = graphData.zubiDubiStrategies ?? []
+const market = graphData.markets?.[0] ?? null
 
 if (strategies.length === 0) {
   console.error(`No active indexed ZubiDubi strategies for ${tokenIn} -> ${tokenOut}.`)
@@ -72,6 +88,7 @@ console.log(JSON.stringify({
   source: 'the-graph-studio + sepolia-rpc',
   graphEndpoint: endpoint,
   routeExecutor: deployment.routeExecutor,
+  market,
   indexedStrategies: strategies.length,
   requestedReceiptIn: formatUnits(amountIn, receiptDecimals),
   quotedReceiptIn: formatUnits(totalIn, receiptDecimals),

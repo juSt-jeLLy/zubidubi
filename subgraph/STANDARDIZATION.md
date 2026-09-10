@@ -11,6 +11,8 @@ The schema follows the standardized-subgraph pattern instead of exposing only be
 - `Token`: normalized token metadata.
 - `Swap`: DEX/aggregator-style fill records.
 - `RouteFee`: protocol-side revenue records.
+- `Market`: pair-level liquidity, volume, revenue, and utilization records.
+- `RouteFill`: maker-level execution tape with normalized price.
 
 ZubiDubi then layers protocol-specific entities on top:
 
@@ -19,6 +21,7 @@ ZubiDubi then layers protocol-specific entities on top:
 - `MakerExposure`: maker receipt inventory, used by the solver and risk UI.
 - `ReceiptAsset`: underlying, maturity, mint, and burn tracking.
 - `MakerSkip`: skipped makers from real deliverability checks.
+- `StrategySnapshot`: historical strategy state for route replay, risk review, and frontend charts.
 
 This makes one query pattern reusable across:
 
@@ -44,6 +47,8 @@ The root app command `npm run zubidubi:graph-quote` uses this subgraph as the so
 4. Return a best-first route preview, candidate maker quotes, skipped makers, and net seller output.
 
 This is the same pattern a frontend and production solver should use: The Graph narrows the market, then contracts perform final freshness checks and atomic settlement.
+
+Compared to a basic event indexer, this gives ZubiDubi the same category of data plane that stronger Aqua projects used: an indexed live market that a deterministic solver can consume.
 
 ## Future Substreams Upgrade
 
