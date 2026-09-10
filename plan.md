@@ -304,7 +304,7 @@ Responsibilities across the library:
 - Set `ctx.swap.amountIn` for exact-out exits if needed.
 - Revert if discount or maturity violates maker limits.
 
-The older `_aquaExitTermSwap1D` compatibility wrapper remains in the source and tests as a reference implementation, but current Sepolia scripts and SDK helpers build the modular instruction sequence.
+One Aqua opcode slot is reserved for index stability. Current contracts, tests, Sepolia scripts, SDK helpers, Graph-indexed strategies, and solver paths all use the modular instruction sequence.
 
 ### Instruction roles
 
@@ -373,7 +373,7 @@ SDK should expose:
 - Args class for term curve config.
 - Args coder.
 - Opcode constant.
-- Builder method like `aquaExitTermSwap1D(args)`.
+- Builder method like `aquaExitTermLibrary(args)` to emit the backing/oracle check, exposure cap, and discount curve sequence.
 - Tests proving encoding/decoding.
 
 ## Routing across multiple Aqua positions
@@ -573,13 +573,14 @@ Completed so far:
 - The Graph subgraph is deployed on Subgraph Studio and indexes Aqua strategies, SwapVM fills, ZubiDubi routes, maker skips, receipt lifecycle, maker exposure, and DAO/protocol fees.
 - Graph-backed solver app script added at `scripts/zubidubi-graph-solver.mjs`; it queries live indexed strategies, decodes executable SwapVM orders, and uses Sepolia RPC for final `quoteExactIn` freshness checks.
 - Graph-backed solver quote validated against live Sepolia: it found 3 indexed strategies and quoted a 0.003 zbETH exit through `ZubiDubiRouteExecutor` using Graph-discovered order data.
-- Upgraded Graph layer to `v0.3.0` with a solver-grade market book, per-route maker fills, execution price history, strategy snapshots, market-level volume, market-level exposure, and market-level DAO fee accrual.
-- Deployed the upgraded Subgraph Studio version at `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.3.0` and validated live queries against real Sepolia events.
+- Upgraded Graph layer to `v0.4.0` with a solver-grade market book, per-route maker fills, execution price history, strategy snapshots, market-level volume, market-level exposure, and market-level DAO fee accrual.
+- Deployed the upgraded Subgraph Studio version at `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.4.0` and validated live queries against real Sepolia events.
 - Added reusable Aqua Liquidity Substreams package at `substreams/aqua-liquidity`; it extracts standardized Aqua `SHIPPED`, `PUSHED`, `PULLED`, and `DOCKED` events from EVM blocks, compiles with `cargo check`, and builds successfully to `wasm32-unknown-unknown`.
-- Split the former AquaExit mega-instruction into a reusable SwapVM instruction library: backing/oracle validation, exposure-cap validation, and term-discount curve pricing. Sepolia demo scripts and the local TypeScript SDK now build the modular sequence.
-- Kept the deployable ZubiDubi `AquaSwapVMRouter` under EIP-170 by pruning the unused Aqua `Extruction` opcode slot while leaving `Extruction` available elsewhere in the repo. Current production router runtime size is 23,708 bytes, with 868 bytes of margin.
-- Redeployed the modular instruction-library stack on Sepolia: Aqua, `AquaSwapVMRouter`, `ZubiDubiExitReceipt`, and `ZubiDubiRouteExecutor`.
-- Executed a fresh modular routed Sepolia fill and redeployed the Subgraph Studio endpoint as `v0.3.0`; the root Graph-backed solver now queries the new subgraph, discovers 3 live strategies, and re-quotes through the new route executor.
+- Built AquaExit as a reusable SwapVM instruction library: backing/oracle validation, exposure-cap validation, and term-discount curve pricing. Sepolia demo scripts and the local TypeScript SDK build the modular sequence.
+- Kept the deployable ZubiDubi `AquaSwapVMRouter` under EIP-170 by pruning the unused Aqua `Extruction` opcode slot while leaving `Extruction` available elsewhere in the repo. Current production router runtime size is 23,624 bytes, with 952 bytes of margin.
+- Redeployed the modular-only instruction-library stack on Sepolia: Aqua, `AquaSwapVMRouter`, `ZubiDubiExitReceipt`, and `ZubiDubiRouteExecutor`.
+- Removed the old single AquaExit opcode from the production opcode table, SDK builder, SDK opcode list, tests, and strategy scripts. Slot `0x23` is reserved for index stability; all current contracts, tests, Sepolia scripts, SDK helpers, Graph-indexed strategies, and solver paths use the modular opcode sequence.
+- Executed a fresh modular routed Sepolia fill and redeployed the Subgraph Studio endpoint as `v0.4.0`; the root Graph-backed solver now queries the new subgraph, discovers 3 live strategies, and re-quotes through the new route executor.
 
 Next build targets:
 
@@ -723,7 +724,7 @@ Use `AquaSwapVMRouter`, not full `SwapVMRouter`.
 - Phase 1: custom `AquaExitTerm` SwapVM instruction added to the local `AquaSwapVMRouter` opcode table.
 - Phase 2: Aqua settlement tests prove a taker can sell delayed-exit receipt tokens and receive maker wallet-held quote tokens.
 - Phase 3: `ZubiDubiRouteExecutor` added. It quotes, filters, sorts, and atomically executes routed exits across multiple Aqua strategies.
-- Phase 4: TypeScript SDK support added for encoding and building the custom `aquaExitTermSwap1D` instruction.
+- Phase 4: TypeScript SDK support added for encoding and building the modular `aquaExitTermLibrary()` instruction sequence.
 - Phase 5: executable Foundry demo added in `swap-vm/test/ZubiDubiDemo.t.sol`.
 - Phase 6: receipt token upgraded into an underlying-backed delayed-redemption receipt with maturity-gated redemption.
 - Phase 7: term curve upgraded with hard max exposure and maker inventory pricing.
@@ -736,20 +737,20 @@ Use `AquaSwapVMRouter`, not full `SwapVMRouter`.
 
 Note: the local opcode args are now 138 bytes because maker risk policy is encoded directly in the curve. The current Sepolia deployment below uses this upgraded format.
 
-Current size check: the production `AquaSwapVMRouter` compiles under the EIP-170 runtime limit at 23,708 bytes, with 868 bytes of margin. The debug router is oversized, but it is not the router intended for deployment.
+Current size check: the production `AquaSwapVMRouter` compiles under the EIP-170 runtime limit at 23,624 bytes, with 952 bytes of margin. The debug router is oversized, but it is not the router intended for deployment.
 
 Current Sepolia deployment:
 
-- Aqua: `0x7E24a4C02F46dD2EF5A98c8865F6cA3Ab87bDFA9`.
-- AquaSwapVMRouter: `0xC124B7Db44306C411e51a8273e141b4FD3018662`.
-- ZubiDubiRouteExecutor: `0x62c99Fb801C6E3Ded8549bDD2B33abdDe0bAD354`.
-- ZubiDubiExitReceipt: `0x1585b2f1C396Cd9295e58FC0B51c065Ad5d68c03`.
-- Deploy Aqua tx: `0xa486e96f8dd58dfbe8554c3dbe8450fd9340d3ccd2289bc28016016f45618503`.
-- Deploy AquaSwapVMRouter tx: `0x96ebe0aa7afbf7b704a0919ebb42520f639d884d87f4d503528f66587fea40bd`.
-- Deploy ZubiDubiExitReceipt tx: `0xfbd1e2efca306f8b52066122684f2a78a417d1d0019fd79f1b7083a29054c3a9`.
-- Deploy ZubiDubiRouteExecutor tx: `0x685e07240027b0fe10fd28bf114f392aea636bc6cd634af087ed2a973c0fb028`.
-- Routed Sepolia demo final sell tx: `0x55d171c389bddbf9d8afeefbed81f9690cece1938c1dd6fae3b3a651be3f5acc`.
-- Modular demo seller: `0x3DCf0FE837E672eBd4b8360B3D6Ec8087EE8F9d5`.
+- Aqua: `0x4D70dD3B2594A8AeD0544CE0434A2f93E27931AB`.
+- AquaSwapVMRouter: `0xc8a540840D23398fF44B4a20Cbc612d3b0ED0ECc`.
+- ZubiDubiRouteExecutor: `0xF6AA860E4d48BDEe0e1ec9B794ebB6ce1B0D00d2`.
+- ZubiDubiExitReceipt: `0x77ACf02293f802DF621d5ff0077e410dCf05C2fa`.
+- Deploy Aqua tx: `0xfebad005fcdd19f4e3e6014e588940efb8a72934313e6e03d1988ae89ea2987a`.
+- Deploy AquaSwapVMRouter tx: `0xa95c8c6d3604b992e5affefe001c6508f2f85585ec95628cd6814cc1b9c823a0`.
+- Deploy ZubiDubiExitReceipt tx: `0x79d547f3951e536b70cddd2e8786a111141cae00ca17a9dbdbfaeeea06bc1bb9`.
+- Deploy ZubiDubiRouteExecutor tx: `0x6336c7f26fac0582ec0ff74355295d7ba07eced6ec51e7f4762ea81dc390d424`.
+- Routed Sepolia demo final sell tx: `0x845229237df8a77690fcd59fd753f4cfe7491f60379d7eb8f7e00246c62ce0ce`.
+- Modular demo seller: `0x79bBf5789Bf20937E83ce26d9Ce9Df43D3EEeA6e`.
 - Modular demo result: sold `0.003 zbETH` for `7.256317 USDC` net.
 
 ### Demo Proof
@@ -779,12 +780,13 @@ Current Sepolia deployment:
 
 Live Sepolia routed proof:
 
-- Route executor: `0x21dBAcFBbe7E047Efe94F846BA24FF031379B947`.
-- Seller contract: `0xdFDC728088897f167e1A1378eE404e2Ae6E4A5c1`.
-- Routed swap transaction: `0x811129fc13da8099509b6d06f3c3da850959ec7b6c65f8a399679a14e0045f18`.
+- Route executor: `0xF6AA860E4d48BDEe0e1ec9B794ebB6ce1B0D00d2`.
+- Seller contract: `0x79bBf5789Bf20937E83ce26d9Ce9Df43D3EEeA6e`.
+- Routed swap transaction: `0x845229237df8a77690fcd59fd753f4cfe7491f60379d7eb8f7e00246c62ce0ce`.
 - Seller sold `0.003 zbETH`.
-- Seller received `7.251837 USDC`.
+- Seller received `7.256317 USDC`.
 - Maker wallet received the delayed-exit receipt exposure.
+- The live Graph-backed solver now discovers the 3 indexed modular strategies from `v0.4.0` and re-quotes the next 0.003 zbETH exit at `7.200773 USDC` net after inventory/exposure repricing.
 
 ## Final submission story
 

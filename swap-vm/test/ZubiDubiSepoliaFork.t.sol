@@ -225,7 +225,9 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
         Program memory p = ProgramBuilder.init(_opcodes());
 
         bytes memory program = bytes.concat(
-            p.build(AquaExitTerm._aquaExitTermSwap1D, args),
+            p.build(AquaExitTerm._aquaExitBackingOracleCheck, args),
+            p.build(AquaExitTerm._aquaExitExposureCap, args),
+            p.build(AquaExitTerm._aquaExitDiscountCurve1D, args),
             p.build(Controls._salt, ControlsArgsBuilder.buildSalt(uint64(uint256(saltSeed))))
         );
 

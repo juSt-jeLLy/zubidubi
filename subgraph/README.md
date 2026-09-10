@@ -28,7 +28,7 @@ npm run deploy:studio
 Live Studio endpoint:
 
 ```text
-https://api.studio.thegraph.com/query/1760034/zubidubi/v0.3.0
+https://api.studio.thegraph.com/query/1760034/zubidubi/v0.4.0
 ```
 
 Run a live provider query:
@@ -47,19 +47,19 @@ That command queries active strategies from this live subgraph, decodes the inde
 
 ## Live Sepolia Contracts
 
-- Aqua: `0x7E24a4C02F46dD2EF5A98c8865F6cA3Ab87bDFA9`
-- AquaSwapVMRouter: `0xC124B7Db44306C411e51a8273e141b4FD3018662`
-- ZubiDubiRouteExecutor: `0x62c99Fb801C6E3Ded8549bDD2B33abdDe0bAD354`
-- ZubiDubiExitReceipt: `0x1585b2f1C396Cd9295e58FC0B51c065Ad5d68c03`
-- Start block: `11673578`
+- Aqua: `0x4D70dD3B2594A8AeD0544CE0434A2f93E27931AB`
+- AquaSwapVMRouter: `0xc8a540840D23398fF44B4a20Cbc612d3b0ED0ECc`
+- ZubiDubiRouteExecutor: `0xF6AA860E4d48BDEe0e1ec9B794ebB6ce1B0D00d2`
+- ZubiDubiExitReceipt: `0x77ACf02293f802DF621d5ff0077e410dCf05C2fa`
+- Start block: `11673656`
 
 ## Live Proof Transactions
 
-- Deploy Aqua: `0xa486e96f8dd58dfbe8554c3dbe8450fd9340d3ccd2289bc28016016f45618503`
-- Deploy AquaSwapVMRouter: `0x96ebe0aa7afbf7b704a0919ebb42520f639d884d87f4d503528f66587fea40bd`
-- Deploy ZubiDubiExitReceipt: `0xfbd1e2efca306f8b52066122684f2a78a417d1d0019fd79f1b7083a29054c3a9`
-- Deploy ZubiDubiRouteExecutor: `0x685e07240027b0fe10fd28bf114f392aea636bc6cd634af087ed2a973c0fb028`
-- Routed Sepolia demo final sell transaction: `0x55d171c389bddbf9d8afeefbed81f9690cece1938c1dd6fae3b3a651be3f5acc`
+- Deploy Aqua: `0xfebad005fcdd19f4e3e6014e588940efb8a72934313e6e03d1988ae89ea2987a`
+- Deploy AquaSwapVMRouter: `0xa95c8c6d3604b992e5affefe001c6508f2f85585ec95628cd6814cc1b9c823a0`
+- Deploy ZubiDubiExitReceipt: `0x79d547f3951e536b70cddd2e8786a111141cae00ca17a9dbdbfaeeea06bc1bb9`
+- Deploy ZubiDubiRouteExecutor: `0x6336c7f26fac0582ec0ff74355295d7ba07eced6ec51e7f4762ea81dc390d424`
+- Routed Sepolia demo final sell transaction: `0x845229237df8a77690fcd59fd753f4cfe7491f60379d7eb8f7e00246c62ce0ce`
 
 The modular routed demo sold `0.003 zbETH` and paid `7.256317 USDC` net to the seller.
 

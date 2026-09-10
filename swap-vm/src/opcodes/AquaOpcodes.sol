@@ -74,8 +74,8 @@ contract AquaOpcodes is
             // reusable native instructions replace the former one-off Extruction path.
             _notInstruction,
             Controls._onlyTxOriginTokenBalanceNonZero,
-            // ZubiDubi AquaExit compatibility wrapper
-            AquaExitTerm._aquaExitTermSwap1D,
+            // Reserved for ZubiDubi AquaExit library index stability.
+            _notInstruction,
             // ZubiDubi reusable term-liquidity instruction library
             AquaExitTerm._aquaExitBackingOracleCheck,
             AquaExitTerm._aquaExitExposureCap,

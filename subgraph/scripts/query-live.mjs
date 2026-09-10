@@ -2,7 +2,7 @@ import 'dotenv/config'
 
 const endpoint =
   process.env.ZUBIDUBI_SUBGRAPH_ENDPOINT ||
-  'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.3.0'
+  'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.4.0'
 
 const query = `{
   markets(first: 10, orderBy: cumulativeVolumeOut, orderDirection: desc) {

@@ -3,11 +3,6 @@
 import { AquaExitTermArgs } from './aqua-exit-term-args'
 import { Opcode } from '../opcode'
 
-export const aquaExitTermSwap1D: Opcode<AquaExitTermArgs> = new Opcode(
-  Symbol('AquaExitTerm.aquaExitTermSwap1D'),
-  AquaExitTermArgs.CODER,
-)
-
 export const aquaExitBackingOracleCheck: Opcode<AquaExitTermArgs> = new Opcode(
   Symbol('AquaExitTerm.aquaExitBackingOracleCheck'),
   AquaExitTermArgs.CODER,

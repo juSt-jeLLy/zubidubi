@@ -242,19 +242,6 @@ export class AquaProgramBuilder extends ProgramBuilder {
   }
 
   /**
-   * Prices a delayed-redemption exit using a term-discount curve
-   **/
-  public aquaExitTermSwap1D(data: DataFor<aquaExitTerm.AquaExitTermArgs>): this {
-    super.add(
-      aquaExitTerm.aquaExitTermSwap1D.createIx(
-        this.buildAquaExitTermArgs(data),
-      ),
-    )
-
-    return this
-  }
-
-  /**
    * Validates delayed-redemption asset pair, maturity window, and oracle freshness.
    **/
   public aquaExitBackingOracleCheck(data: DataFor<aquaExitTerm.AquaExitTermArgs>): this {

@@ -181,34 +181,6 @@ contract AquaExitTerm {
         _applyDiscountCurve(ctx, parsed, price);
     }
 
-    /// @param args.baseDiscountBps  | 4 bytes
-    /// @param args.annualRateBps    | 4 bytes
-    /// @param args.maxDiscountBps   | 4 bytes
-    /// @param args.maturity         | 5 bytes
-    /// @param args.maxStaleness     | 4 bytes
-    /// @param args.tokenInDecimals  | 1 byte
-    /// @param args.tokenOutDecimals | 1 byte
-    /// @param args.oracleDecimals   | 1 byte
-    /// @param args.oracleAddress    | 20 bytes
-    /// @param args.maxExposure      | 16 bytes
-    /// @param args.inventorySlopeBps| 4 bytes
-    /// @param args.maxNotionalOut   | 16 bytes
-    /// @param args.liquiditySlopeBps| 4 bytes
-    /// @param args.riskTierBps      | 4 bytes
-    /// @param args.minMaturity      | 5 bytes
-    /// @param args.maxMaturity      | 5 bytes
-    /// @param args.allowedTokenIn   | 20 bytes
-    /// @param args.allowedTokenOut  | 20 bytes
-    function _aquaExitTermSwap1D(Context memory ctx, bytes calldata args) internal view {
-        AquaExitTermArgsBuilder.Args memory parsed = AquaExitTermArgsBuilder.parse(args);
-
-        _checkAllowedMarket(ctx.query.tokenIn, ctx.query.tokenOut, parsed.allowedTokenIn, parsed.allowedTokenOut);
-        _checkMaturity(parsed.maturity, parsed.minMaturity, parsed.maxMaturity);
-        uint256 price = _oraclePrice1e18(parsed.oracleAddress, parsed.oracleDecimals, parsed.maxStaleness);
-
-        _applyDiscountCurve(ctx, parsed, price);
-    }
-
     function _applyDiscountCurve(
         Context memory ctx,
         AquaExitTermArgsBuilder.Args memory parsed,

@@ -6,12 +6,12 @@ ZubiDubi lets a seller exit a delayed asset such as an LRT withdrawal receipt, P
 
 ## Live Sepolia Stack
 
-- Aqua: `0x7E24a4C02F46dD2EF5A98c8865F6cA3Ab87bDFA9`
-- AquaSwapVMRouter: `0xC124B7Db44306C411e51a8273e141b4FD3018662`
-- ZubiDubiRouteExecutor: `0x62c99Fb801C6E3Ded8549bDD2B33abdDe0bAD354`
-- ZubiDubiExitReceipt: `0x1585b2f1C396Cd9295e58FC0B51c065Ad5d68c03`
+- Aqua: `0x4D70dD3B2594A8AeD0544CE0434A2f93E27931AB`
+- AquaSwapVMRouter: `0xc8a540840D23398fF44B4a20Cbc612d3b0ED0ECc`
+- ZubiDubiRouteExecutor: `0xF6AA860E4d48BDEe0e1ec9B794ebB6ce1B0D00d2`
+- ZubiDubiExitReceipt: `0x77ACf02293f802DF621d5ff0077e410dCf05C2fa`
 - Subgraph Studio: `https://thegraph.com/studio/subgraph/zubidubi`
-- Subgraph endpoint: `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.3.0`
+- Subgraph endpoint: `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.4.0`
 
 ## Graph-Backed Solver
 
@@ -52,7 +52,7 @@ This is the Graph-composability upgrade path: Substreams handles fast cross-chai
 
 ## Current Proof
 
-- Real routed Sepolia fill: `0x55d171c389bddbf9d8afeefbed81f9690cece1938c1dd6fae3b3a651be3f5acc`
+- Real routed Sepolia fill: `0x845229237df8a77690fcd59fd753f4cfe7491f60379d7eb8f7e00246c62ce0ce`
 - Demo sold `0.003 zbETH`.
 - Seller received `7.256317 USDC` net.
 - DAO/protocol fee is indexed by the live subgraph.

@@ -63,23 +63,6 @@ contract AquaExitTermTest is AquaSwapVMTest {
         assertEq(usdcVirtualBalance, makerUsdcLiquidity - 2_940.6 ether);
     }
 
-    function test_AquaExitTerm_ModularInstructionLibraryMatchesCompatibilityOpcode() public {
-        bytes memory args = _buildAquaExitArgs(100, 1200, 300, uint40(block.timestamp + 30 days), 1 hours);
-        ISwapVM.Order memory compatibilityOrder = _createAquaExitOrderFor(maker, args, bytes32(uint256(1)));
-        ISwapVM.Order memory modularOrder = _createModularAquaExitOrderFor(maker, args, bytes32(uint256(2)));
-
-        _shipAquaExitOrderFor(maker, compatibilityOrder, 5 ether, 10_000 ether);
-        _shipAquaExitOrderFor(maker, modularOrder, 5 ether, 10_000 ether);
-
-        SwapProgram memory swapProgram = _prepareSwap(1 ether, 20_000 ether, true);
-
-        (, uint256 compatibilityAmountOut) = quote(swapProgram, compatibilityOrder);
-        (, uint256 modularAmountOut) = quote(swapProgram, modularOrder);
-
-        assertEq(modularAmountOut, compatibilityAmountOut);
-        assertEq(modularAmountOut, 2_940.6 ether);
-    }
-
     function test_AquaExitTerm_PricesEighteenDecimalReceiptAgainstSixDecimalUsdc() public {
         oracle = new MockPriceOracle(3000e8, 8);
 
@@ -608,40 +591,6 @@ contract AquaExitTermTest is AquaSwapVMTest {
         Program memory p = ProgramBuilder.init(_opcodes());
 
         bytes memory program = bytes.concat(
-            p.build(AquaExitTerm._aquaExitTermSwap1D, args),
-            p.build(Controls._salt, ControlsArgsBuilder.buildSalt(uint64(uint256(saltSeed))))
-        );
-
-        order = MakerTraitsLib.build(MakerTraitsLib.Args({
-            maker: makerAddress,
-            shouldUnwrapWeth: false,
-            useAquaInsteadOfSignature: true,
-            allowZeroAmountIn: false,
-            receiver: address(0),
-            hasPreTransferInHook: false,
-            hasPostTransferInHook: false,
-            hasPreTransferOutHook: false,
-            hasPostTransferOutHook: false,
-            preTransferInTarget: address(0),
-            preTransferInData: "",
-            postTransferInTarget: address(0),
-            postTransferInData: "",
-            preTransferOutTarget: address(0),
-            preTransferOutData: "",
-            postTransferOutTarget: address(0),
-            postTransferOutData: "",
-            program: program
-        }));
-    }
-
-    function _createModularAquaExitOrderFor(
-        address makerAddress,
-        bytes memory args,
-        bytes32 saltSeed
-    ) internal pure returns (ISwapVM.Order memory order) {
-        Program memory p = ProgramBuilder.init(_opcodes());
-
-        bytes memory program = bytes.concat(
             p.build(AquaExitTerm._aquaExitBackingOracleCheck, args),
             p.build(AquaExitTerm._aquaExitExposureCap, args),
             p.build(AquaExitTerm._aquaExitDiscountCurve1D, args),
@@ -669,4 +618,5 @@ contract AquaExitTermTest is AquaSwapVMTest {
             program: program
         }));
     }
+
 }

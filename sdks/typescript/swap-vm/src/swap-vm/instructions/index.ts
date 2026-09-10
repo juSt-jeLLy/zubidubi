@@ -164,7 +164,7 @@ export const aquaInstructions: Opcode<IArgsData>[] = [
   peggedSwap.peggedSwapGrowPriceRange2D, // 32
   EMPTY_OPCODE, // 33 pruned from ZubiDubi Aqua router for reusable AquaExit instructions
   controls.onlyTxOriginTokenBalanceNonZero, // 34
-  aquaExitTerm.aquaExitTermSwap1D, // 35 compatibility wrapper
+  EMPTY_OPCODE, // 35 reserved for ZubiDubi AquaExit library index stability
   aquaExitTerm.aquaExitBackingOracleCheck, // 36
   aquaExitTerm.aquaExitExposureCap, // 37
   aquaExitTerm.aquaExitDiscountCurve1D, // 38
