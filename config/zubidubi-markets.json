@@ -1,0 +1,42 @@
+{
+  "sepolia": {
+    "chainId": 11155111,
+    "mode": "public-testnet-demo",
+    "baseAsset": {
+      "symbol": "zbETH",
+      "address": "0x77ACf02293f802DF621d5ff0077e410dCf05C2fa",
+      "decimals": 18,
+      "assetType": "ZubiDubi delayed-redemption receipt",
+      "oracle": "0x694AA1769357215DE4FAC081bf1f309aDC325306",
+      "oracleDescription": "Chainlink ETH/USD Sepolia"
+    },
+    "quoteAsset": {
+      "symbol": "USDC",
+      "address": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+      "decimals": 6
+    }
+  },
+  "mainnetFork": {
+    "chainId": 1,
+    "mode": "real-asset-fork-proof",
+    "pendleMarket": {
+      "name": "USD3 17DEC2026",
+      "address": "0x4A5067C3fF1abb7449244025B0e37fEAF77D8E3e",
+      "maturity": 1797465600,
+      "maturityIso": "2026-12-17T00:00:00Z"
+    },
+    "baseAsset": {
+      "symbol": "PT-USD3-17DEC2026",
+      "address": "0x7f47c3e6b2c00fC4eB4d5Ae50d0Ab0Ab6888Eb4D",
+      "decimals": 6,
+      "assetType": "Pendle Principal Token",
+      "oracle": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",
+      "oracleDescription": "Chainlink USDC/USD mainnet"
+    },
+    "quoteAsset": {
+      "symbol": "USDC",
+      "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "decimals": 6
+    }
+  }
+}

@@ -57,4 +57,20 @@ This is the Graph-composability upgrade path: Substreams handles fast cross-chai
 - Seller received `7.256317 USDC` net.
 - DAO/protocol fee is indexed by the live subgraph.
 
+## Real Asset Fork Proof
+
+ZubiDubi also has a mainnet-fork proof using a real Pendle Principal Token instead of the Sepolia demo receipt:
+
+- Pendle market: `USD3 17DEC2026` at `0x4A5067C3fF1abb7449244025B0e37fEAF77D8E3e`
+- PT tokenIn: `PT-USD3-17DEC2026` at `0x7f47c3e6b2c00fC4eB4d5Ae50d0Ab0Ab6888Eb4D`
+- Maturity: `1797465600`
+- Quote tokenOut: mainnet USDC at `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48`
+- Oracle: Chainlink USDC/USD at `0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6`
+
+```bash
+MAINNET_RPC_URL=https://eth.drpc.org forge test --match-contract ZubiDubiPendleMainnetForkTest -vv
+```
+
+The fork proof routes an early exit of `220 PT-USD3-17DEC2026` across Aqua makers and settles real ERC20 transfers on forked Ethereum mainnet. Without `MAINNET_RPC_URL`, the test skips cleanly.
+
 See `plan.md` for the full product, technical, and bounty-alignment plan.

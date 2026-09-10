@@ -581,12 +581,14 @@ Completed so far:
 - Redeployed the modular-only instruction-library stack on Sepolia: Aqua, `AquaSwapVMRouter`, `ZubiDubiExitReceipt`, and `ZubiDubiRouteExecutor`.
 - Removed the old single AquaExit opcode from the production opcode table, SDK builder, SDK opcode list, tests, and strategy scripts. Slot `0x23` is reserved for index stability; all current contracts, tests, Sepolia scripts, SDK helpers, Graph-indexed strategies, and solver paths use the modular opcode sequence.
 - Executed a fresh modular routed Sepolia fill and redeployed the Subgraph Studio endpoint as `v0.4.0`; the root Graph-backed solver now queries the new subgraph, discovers 3 live strategies, and re-quotes through the new route executor.
+- Added a real-asset Pendle PT mainnet-fork proof. `ZubiDubiPendleMainnetForkTest` uses real `PT-USD3-17DEC2026` as `tokenIn`, real mainnet USDC as `tokenOut`, the PT's real Pendle maturity, and real Chainlink USDC/USD for par-value pricing. This turns the receipt story into a concrete maturing-asset market instead of only a custom demo receipt.
 
 Next build targets:
 
 - Add optional execution mode to the Graph-backed solver so it can submit the routed exit after quoting.
 - Add a frontend that uses the same Graph solver data for market discovery, route preview, risk panels, fee analytics, and live fill history.
 - Install the Substreams CLI and run the Aqua Liquidity Substreams module against a live The Graph Market or Pinax endpoint for the strongest possible Graph bounty demo.
+- Add a Pendle market benchmark panel to compare ZubiDubi maker quotes against Pendle's live implied PT pricing on the same asset.
 
 ## Graph layer: winner-level positioning
 
@@ -752,6 +754,16 @@ Current Sepolia deployment:
 - Routed Sepolia demo final sell tx: `0x845229237df8a77690fcd59fd753f4cfe7491f60379d7eb8f7e00246c62ce0ce`.
 - Modular demo seller: `0x79bBf5789Bf20937E83ce26d9Ce9Df43D3EEeA6e`.
 - Modular demo result: sold `0.003 zbETH` for `7.256317 USDC` net.
+
+Current mainnet-fork real asset:
+
+- Pendle market: `USD3 17DEC2026`.
+- Pendle market address: `0x4A5067C3fF1abb7449244025B0e37fEAF77D8E3e`.
+- Pendle PT token: `PT-USD3-17DEC2026` at `0x7f47c3e6b2c00fC4eB4d5Ae50d0Ab0Ab6888Eb4D`.
+- PT maturity: `1797465600` (`2026-12-17T00:00:00Z`).
+- Mainnet USDC: `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48`.
+- Mainnet Chainlink USDC/USD: `0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6`.
+- Fork proof result: sold `220 PT-USD3-17DEC2026` for `212.261280 USDC` net after DAO fee.
 
 ### Demo Proof
 

@@ -23,6 +23,7 @@ library ZubiDubiConfig {
     }
 
     uint256 internal constant SEPOLIA_CHAIN_ID = 11_155_111;
+    uint256 internal constant MAINNET_CHAIN_ID = 1;
 
     address internal constant SEPOLIA_AQUA = 0x4D70dD3B2594A8AeD0544CE0434A2f93E27931AB;
     address internal constant SEPOLIA_AQUA_SWAP_VM_ROUTER = 0xc8a540840D23398fF44B4a20Cbc612d3b0ED0ECc;
@@ -31,6 +32,12 @@ library ZubiDubiConfig {
     address internal constant SEPOLIA_WETH = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14;
     address internal constant SEPOLIA_USDC = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238;
     address internal constant SEPOLIA_CHAINLINK_ETH_USD = 0x694AA1769357215DE4FAC081bf1f309aDC325306;
+
+    address internal constant MAINNET_WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    address internal constant MAINNET_USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address internal constant MAINNET_CHAINLINK_USDC_USD = 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6;
+    address internal constant MAINNET_PENDLE_USD3_MARKET_17DEC2026 = 0x4A5067C3fF1abb7449244025B0e37fEAF77D8E3e;
+    address internal constant MAINNET_PT_USD3_17DEC2026 = 0x7f47c3e6b2c00fC4eB4d5Ae50d0Ab0Ab6888Eb4D;
 
     function sepolia() internal pure returns (NetworkConfig memory) {
         return NetworkConfig({
@@ -63,6 +70,28 @@ library ZubiDubiConfig {
             decimals: 6,
             priceFeed: address(0),
             priceFeedDecimals: 0,
+            isReceipt: false
+        });
+    }
+
+    function mainnetPendlePtUsd3Asset() internal pure returns (TokenConfig memory) {
+        return TokenConfig({
+            symbol: "PT-USD3-17DEC2026",
+            token: MAINNET_PT_USD3_17DEC2026,
+            decimals: 6,
+            priceFeed: MAINNET_CHAINLINK_USDC_USD,
+            priceFeedDecimals: 8,
+            isReceipt: true
+        });
+    }
+
+    function mainnetUsdcAsset() internal pure returns (TokenConfig memory) {
+        return TokenConfig({
+            symbol: "USDC",
+            token: MAINNET_USDC,
+            decimals: 6,
+            priceFeed: MAINNET_CHAINLINK_USDC_USD,
+            priceFeedDecimals: 8,
             isReceipt: false
         });
     }
