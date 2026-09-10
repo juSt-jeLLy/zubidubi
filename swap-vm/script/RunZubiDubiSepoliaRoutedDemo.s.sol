@@ -57,12 +57,12 @@ contract RunZubiDubiSepoliaRoutedDemo is Script {
         // so this strategy EXECUTES the convex curve in the real settlement below.
         // (Live A/B proven in the previous run on this stack: identical linear twin
         // quoted 7,188,333 vs convex 7,164,179 USDC units ≈ 33.6 bps premium.)
-        orders[0] = _order(maker, _program(receiptAsset, quoteAsset, 50, 600, 300, 1, 5_000));
+        orders[0] = _order(maker, _program(receiptAsset, quoteAsset, 50, 600, 300, 1, 5000));
         // Linear support: higher discount, never wins against the convex order while
         // convex capacity remains.
-        orders[1] = _order(maker, _program(receiptAsset, quoteAsset, 100, 1_200, 300, 0, 0));
+        orders[1] = _order(maker, _program(receiptAsset, quoteAsset, 100, 1200, 300, 0, 0));
         // Linear support, steepest discount: depth fill.
-        orders[2] = _order(maker, _program(receiptAsset, quoteAsset, 200, 2_400, 500, 0, 0));
+        orders[2] = _order(maker, _program(receiptAsset, quoteAsset, 200, 2400, 500, 0, 0));
 
         vm.startBroadcast(deployerPk);
 
@@ -79,12 +79,7 @@ contract RunZubiDubiSepoliaRoutedDemo is Script {
         vm.stopBroadcast();
 
         (uint256 quotedIn, uint256 quotedOut, ZubiDubiRouteExecutor.Quote[] memory quotes) =
-            routeExecutor.quoteExactIn(
-                orders,
-                receiptAsset.token,
-                quoteAsset.token,
-                0.003 ether
-            );
+            routeExecutor.quoteExactIn(orders, receiptAsset.token, quoteAsset.token, 0.003 ether);
 
         console2.log("Curve families: strategy[0] convex(5000) | strategy[1] linear(100) | strategy[2] linear(200)");
         for (uint256 i = 0; i < quotes.length; i++) {
@@ -100,14 +95,8 @@ contract RunZubiDubiSepoliaRoutedDemo is Script {
 
         vm.startBroadcast(deployerPk);
 
-        (uint256 totalIn, uint256 totalOut) = seller.sellExactIn(
-            orders,
-            receiptAsset.token,
-            quoteAsset.token,
-            0.003 ether,
-            quotedOut,
-            address(seller)
-        );
+        (uint256 totalIn, uint256 totalOut) =
+            seller.sellExactIn(orders, receiptAsset.token, quoteAsset.token, 0.003 ether, quotedOut, address(seller));
 
         vm.stopBroadcast();
 
@@ -138,7 +127,9 @@ contract RunZubiDubiSepoliaRoutedDemo is Script {
         address tokenOut,
         uint256,
         uint256 usdcLiquidity
-    ) private {
+    )
+        private
+    {
         address[] memory tokens = new address[](2);
         tokens[0] = tokenIn;
         tokens[1] = tokenOut;
@@ -159,8 +150,13 @@ contract RunZubiDubiSepoliaRoutedDemo is Script {
         uint32 maxDiscountBps,
         uint8 curveFamily,
         uint32 convexityBps
-    ) private view returns (bytes memory) {
-        bytes memory args = AquaExitTermArgsBuilder.build(AquaExitTermArgsBuilder.Args({
+    )
+        private
+        view
+        returns (bytes memory)
+    {
+        bytes memory args = AquaExitTermArgsBuilder.build(
+            AquaExitTermArgsBuilder.Args({
                 baseDiscountBps: baseDiscountBps,
                 annualRateBps: annualRateBps,
                 maxDiscountBps: maxDiscountBps,
@@ -184,35 +180,41 @@ contract RunZubiDubiSepoliaRoutedDemo is Script {
                 deviationHaircutBps: deviationHaircutBps,
                 curveFamily: curveFamily,
                 convexityBps: convexityBps
-        }));
+            })
+        );
 
         return bytes.concat(
-            abi.encodePacked(OP_AQUA_EXIT_BACKING_ORACLE_CHECK, uint8(args.length)), args,
-            abi.encodePacked(OP_AQUA_EXIT_EXPOSURE_CAP, uint8(args.length)), args,
-            abi.encodePacked(OP_AQUA_EXIT_DISCOUNT_CURVE_1D, uint8(args.length)), args
+            abi.encodePacked(OP_AQUA_EXIT_BACKING_ORACLE_CHECK, uint8(args.length)),
+            args,
+            abi.encodePacked(OP_AQUA_EXIT_EXPOSURE_CAP, uint8(args.length)),
+            args,
+            abi.encodePacked(OP_AQUA_EXIT_DISCOUNT_CURVE_1D, uint8(args.length)),
+            args
         );
     }
 
     function _order(address maker, bytes memory program) private pure returns (ISwapVM.Order memory) {
-        return MakerTraitsLib.build(MakerTraitsLib.Args({
-            maker: maker,
-            shouldUnwrapWeth: false,
-            useAquaInsteadOfSignature: true,
-            allowZeroAmountIn: false,
-            receiver: address(0),
-            hasPreTransferInHook: false,
-            hasPostTransferInHook: false,
-            hasPreTransferOutHook: false,
-            hasPostTransferOutHook: false,
-            preTransferInTarget: address(0),
-            preTransferInData: "",
-            postTransferInTarget: address(0),
-            postTransferInData: "",
-            preTransferOutTarget: address(0),
-            preTransferOutData: "",
-            postTransferOutTarget: address(0),
-            postTransferOutData: "",
-            program: program
-        }));
+        return MakerTraitsLib.build(
+            MakerTraitsLib.Args({
+                maker: maker,
+                shouldUnwrapWeth: false,
+                useAquaInsteadOfSignature: true,
+                allowZeroAmountIn: false,
+                receiver: address(0),
+                hasPreTransferInHook: false,
+                hasPostTransferInHook: false,
+                hasPreTransferOutHook: false,
+                hasPostTransferOutHook: false,
+                preTransferInTarget: address(0),
+                preTransferInData: "",
+                postTransferInTarget: address(0),
+                postTransferInData: "",
+                preTransferOutTarget: address(0),
+                preTransferOutData: "",
+                postTransferOutTarget: address(0),
+                postTransferOutData: "",
+                program: program
+            })
+        );
     }
 }

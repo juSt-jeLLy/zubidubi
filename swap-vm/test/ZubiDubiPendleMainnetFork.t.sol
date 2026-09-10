@@ -59,11 +59,7 @@ contract ZubiDubiPendleMainnetForkTest is Test, AquaOpcodesDebug {
 
         aqua = new Aqua();
         swapVM = new AquaSwapVMRouter(
-            address(aqua),
-            ZubiDubiConfig.MAINNET_WETH,
-            address(this),
-            "ZubiDubiAquaSwapVMRouter",
-            "1.0.0"
+            address(aqua), ZubiDubiConfig.MAINNET_WETH, address(this), "ZubiDubiAquaSwapVMRouter", "1.0.0"
         );
         routeExecutor = new ZubiDubiRouteExecutor(aqua, swapVM, feeRecipient, 10, 8);
         seller = new ZubiDubiDemoSeller(routeExecutor, address(this));
@@ -79,20 +75,11 @@ contract ZubiDubiPendleMainnetForkTest is Test, AquaOpcodesDebug {
 
         ISwapVM.Order[] memory orders = new ISwapVM.Order[](3);
         orders[0] = _createExitOrder(
-            unavailableMaker,
-            _buildPendlePtExitArgs(25, 500, 500, maturity),
-            bytes32("unavailable-pendle")
+            unavailableMaker, _buildPendlePtExitArgs(25, 500, 500, maturity), bytes32("unavailable-pendle")
         );
-        orders[1] = _createExitOrder(
-            makerA,
-            _buildPendlePtExitArgs(50, 600, 650, maturity),
-            bytes32("maker-a-pendle")
-        );
-        orders[2] = _createExitOrder(
-            makerB,
-            _buildPendlePtExitArgs(100, 1_000, 900, maturity),
-            bytes32("maker-b-pendle")
-        );
+        orders[1] = _createExitOrder(makerA, _buildPendlePtExitArgs(50, 600, 650, maturity), bytes32("maker-a-pendle"));
+        orders[2] =
+            _createExitOrder(makerB, _buildPendlePtExitArgs(100, 1000, 900, maturity), bytes32("maker-b-pendle"));
 
         bytes32 unavailableHash = _shipExitOrder(unavailableMaker, orders[0], 100e6);
         bytes32 orderHashA = _shipExitOrder(makerA, orders[1], 100e6);
@@ -118,14 +105,8 @@ contract ZubiDubiPendleMainnetForkTest is Test, AquaOpcodesDebug {
         uint256 sellerUsdcBefore = usdc.balanceOf(address(seller));
         uint256 feeRecipientBefore = usdc.balanceOf(feeRecipient);
 
-        (uint256 totalIn, uint256 totalOut) = seller.sellExactIn(
-            orders,
-            address(ptUsd3),
-            address(usdc),
-            220e6,
-            quotedOut,
-            address(seller)
-        );
+        (uint256 totalIn, uint256 totalOut) =
+            seller.sellExactIn(orders, address(ptUsd3), address(usdc), 220e6, quotedOut, address(seller));
 
         assertEq(totalIn, 220e6);
         assertEq(totalOut, quotedOut);
@@ -134,27 +115,12 @@ contract ZubiDubiPendleMainnetForkTest is Test, AquaOpcodesDebug {
         assertGt(usdc.balanceOf(feeRecipient) - feeRecipientBefore, 0);
         assertEq(ptUsd3.balanceOf(makerA) + ptUsd3.balanceOf(makerB) - makerAPtBefore - makerBPtBefore, 220e6);
 
-        (, uint256 unavailableUsdcBalance) = aqua.safeBalances(
-            unavailableMaker,
-            address(swapVM),
-            unavailableHash,
-            address(ptUsd3),
-            address(usdc)
-        );
-        (, uint256 makerAUsdcBalance) = aqua.safeBalances(
-            makerA,
-            address(swapVM),
-            orderHashA,
-            address(ptUsd3),
-            address(usdc)
-        );
-        (, uint256 makerBUsdcBalance) = aqua.safeBalances(
-            makerB,
-            address(swapVM),
-            orderHashB,
-            address(ptUsd3),
-            address(usdc)
-        );
+        (, uint256 unavailableUsdcBalance) =
+            aqua.safeBalances(unavailableMaker, address(swapVM), unavailableHash, address(ptUsd3), address(usdc));
+        (, uint256 makerAUsdcBalance) =
+            aqua.safeBalances(makerA, address(swapVM), orderHashA, address(ptUsd3), address(usdc));
+        (, uint256 makerBUsdcBalance) =
+            aqua.safeBalances(makerB, address(swapVM), orderHashB, address(ptUsd3), address(usdc));
 
         assertEq(unavailableUsdcBalance, 100e6);
         assertLt(makerAUsdcBalance, 100e6);
@@ -188,9 +154,7 @@ contract ZubiDubiPendleMainnetForkTest is Test, AquaOpcodesDebug {
     function _readPendlePtToAssetRate() internal view returns (bool ok, uint256 rate) {
         try IPendleRouterStatic(ZubiDubiConfig.MAINNET_PENDLE_ROUTER_STATIC).getPtToAssetRate(
             ZubiDubiConfig.MAINNET_PENDLE_USD3_MARKET_17DEC2026
-        )
-            returns (uint256 r)
-        {
+        ) returns (uint256 r) {
             return (true, r);
         } catch {
             return (false, 0);
@@ -201,7 +165,10 @@ contract ZubiDubiPendleMainnetForkTest is Test, AquaOpcodesDebug {
         address maker,
         ISwapVM.Order memory order,
         uint256 usdcLiquidity
-    ) internal returns (bytes32 orderHash) {
+    )
+        internal
+        returns (bytes32 orderHash)
+    {
         orderHash = swapVM.hash(order);
 
         vm.prank(maker);
@@ -225,13 +192,8 @@ contract ZubiDubiPendleMainnetForkTest is Test, AquaOpcodesDebug {
 
     function _deliverableUsdc(ISwapVM.Order memory order) internal view returns (uint256) {
         bytes32 orderHash = swapVM.hash(order);
-        (, uint256 aquaBalanceOut) = aqua.safeBalances(
-            order.maker,
-            address(swapVM),
-            orderHash,
-            address(ptUsd3),
-            address(usdc)
-        );
+        (, uint256 aquaBalanceOut) =
+            aqua.safeBalances(order.maker, address(swapVM), orderHash, address(ptUsd3), address(usdc));
 
         uint256 walletBalance = usdc.balanceOf(order.maker);
         uint256 walletAllowance = usdc.allowance(order.maker, address(aqua));
@@ -244,32 +206,38 @@ contract ZubiDubiPendleMainnetForkTest is Test, AquaOpcodesDebug {
         uint32 annualRateBps,
         uint32 maxDiscountBps,
         uint40 maturity
-    ) internal view returns (bytes memory) {
-        return AquaExitTermArgsBuilder.build(AquaExitTermArgsBuilder.Args({
-            baseDiscountBps: baseDiscountBps,
-            annualRateBps: annualRateBps,
-            maxDiscountBps: maxDiscountBps,
-            maturity: maturity,
-            maxStaleness: 2 days,
-            tokenInDecimals: 6,
-            tokenOutDecimals: 6,
-            oracleDecimals: 8,
-            oracleAddress: ZubiDubiConfig.MAINNET_CHAINLINK_USDC_USD,
-            maxExposure: 1_000e6,
-            inventorySlopeBps: 150,
-            maxNotionalOut: 0,
-            liquiditySlopeBps: 25,
-            riskTierBps: 10,
-            minMaturity: uint40(block.timestamp + 1 days),
-            maxMaturity: type(uint40).max,
-            allowedTokenIn: ZubiDubiConfig.MAINNET_PT_USD3_17DEC2026,
-            allowedTokenOut: ZubiDubiConfig.MAINNET_USDC,
-            secondaryOracleAddress: address(0),
-            maxDeviationBps: 0,
-            deviationHaircutBps: 0,
-            curveFamily: 0,
-            convexityBps: 0
-        }));
+    )
+        internal
+        view
+        returns (bytes memory)
+    {
+        return AquaExitTermArgsBuilder.build(
+            AquaExitTermArgsBuilder.Args({
+                baseDiscountBps: baseDiscountBps,
+                annualRateBps: annualRateBps,
+                maxDiscountBps: maxDiscountBps,
+                maturity: maturity,
+                maxStaleness: 2 days,
+                tokenInDecimals: 6,
+                tokenOutDecimals: 6,
+                oracleDecimals: 8,
+                oracleAddress: ZubiDubiConfig.MAINNET_CHAINLINK_USDC_USD,
+                maxExposure: 1000e6,
+                inventorySlopeBps: 150,
+                maxNotionalOut: 0,
+                liquiditySlopeBps: 25,
+                riskTierBps: 10,
+                minMaturity: uint40(block.timestamp + 1 days),
+                maxMaturity: type(uint40).max,
+                allowedTokenIn: ZubiDubiConfig.MAINNET_PT_USD3_17DEC2026,
+                allowedTokenOut: ZubiDubiConfig.MAINNET_USDC,
+                secondaryOracleAddress: address(0),
+                maxDeviationBps: 0,
+                deviationHaircutBps: 0,
+                curveFamily: 0,
+                convexityBps: 0
+            })
+        );
     }
 
     function _buildPendlePtExitArgsWithDualOracle(
@@ -280,39 +248,49 @@ contract ZubiDubiPendleMainnetForkTest is Test, AquaOpcodesDebug {
         address secondaryOracle,
         uint32 maxDeviationBps,
         uint32 deviationHaircutBps
-    ) internal view returns (bytes memory) {
-        return AquaExitTermArgsBuilder.build(AquaExitTermArgsBuilder.Args({
-            baseDiscountBps: baseDiscountBps,
-            annualRateBps: annualRateBps,
-            maxDiscountBps: maxDiscountBps,
-            maturity: maturity,
-            maxStaleness: 2 days,
-            tokenInDecimals: 6,
-            tokenOutDecimals: 6,
-            oracleDecimals: 8,
-            oracleAddress: ZubiDubiConfig.MAINNET_CHAINLINK_USDC_USD,
-            maxExposure: 1_000e6,
-            inventorySlopeBps: 150,
-            maxNotionalOut: 0,
-            liquiditySlopeBps: 25,
-            riskTierBps: 10,
-            minMaturity: uint40(block.timestamp + 1 days),
-            maxMaturity: type(uint40).max,
-            allowedTokenIn: ZubiDubiConfig.MAINNET_PT_USD3_17DEC2026,
-            allowedTokenOut: ZubiDubiConfig.MAINNET_USDC,
-            secondaryOracleAddress: secondaryOracle,
-            maxDeviationBps: maxDeviationBps,
-            deviationHaircutBps: deviationHaircutBps,
-            curveFamily: 0,
-            convexityBps: 0
-        }));
+    )
+        internal
+        view
+        returns (bytes memory)
+    {
+        return AquaExitTermArgsBuilder.build(
+            AquaExitTermArgsBuilder.Args({
+                baseDiscountBps: baseDiscountBps,
+                annualRateBps: annualRateBps,
+                maxDiscountBps: maxDiscountBps,
+                maturity: maturity,
+                maxStaleness: 2 days,
+                tokenInDecimals: 6,
+                tokenOutDecimals: 6,
+                oracleDecimals: 8,
+                oracleAddress: ZubiDubiConfig.MAINNET_CHAINLINK_USDC_USD,
+                maxExposure: 1000e6,
+                inventorySlopeBps: 150,
+                maxNotionalOut: 0,
+                liquiditySlopeBps: 25,
+                riskTierBps: 10,
+                minMaturity: uint40(block.timestamp + 1 days),
+                maxMaturity: type(uint40).max,
+                allowedTokenIn: ZubiDubiConfig.MAINNET_PT_USD3_17DEC2026,
+                allowedTokenOut: ZubiDubiConfig.MAINNET_USDC,
+                secondaryOracleAddress: secondaryOracle,
+                maxDeviationBps: maxDeviationBps,
+                deviationHaircutBps: deviationHaircutBps,
+                curveFamily: 0,
+                convexityBps: 0
+            })
+        );
     }
 
     function _createExitOrder(
         address maker,
         bytes memory args,
         bytes32 saltSeed
-    ) internal pure returns (ISwapVM.Order memory order) {
+    )
+        internal
+        pure
+        returns (ISwapVM.Order memory order)
+    {
         Program memory p = ProgramBuilder.init(_opcodes());
 
         bytes memory program = bytes.concat(
@@ -322,26 +300,28 @@ contract ZubiDubiPendleMainnetForkTest is Test, AquaOpcodesDebug {
             p.build(Controls._salt, ControlsArgsBuilder.buildSalt(uint64(uint256(saltSeed))))
         );
 
-        order = MakerTraitsLib.build(MakerTraitsLib.Args({
-            maker: maker,
-            shouldUnwrapWeth: false,
-            useAquaInsteadOfSignature: true,
-            allowZeroAmountIn: false,
-            receiver: address(0),
-            hasPreTransferInHook: false,
-            hasPostTransferInHook: false,
-            hasPreTransferOutHook: false,
-            hasPostTransferOutHook: false,
-            preTransferInTarget: address(0),
-            preTransferInData: "",
-            postTransferInTarget: address(0),
-            postTransferInData: "",
-            preTransferOutTarget: address(0),
-            preTransferOutData: "",
-            postTransferOutTarget: address(0),
-            postTransferOutData: "",
-            program: program
-        }));
+        order = MakerTraitsLib.build(
+            MakerTraitsLib.Args({
+                maker: maker,
+                shouldUnwrapWeth: false,
+                useAquaInsteadOfSignature: true,
+                allowZeroAmountIn: false,
+                receiver: address(0),
+                hasPreTransferInHook: false,
+                hasPostTransferInHook: false,
+                hasPreTransferOutHook: false,
+                hasPostTransferOutHook: false,
+                preTransferInTarget: address(0),
+                preTransferInData: "",
+                postTransferInTarget: address(0),
+                postTransferInData: "",
+                preTransferOutTarget: address(0),
+                preTransferOutData: "",
+                postTransferOutTarget: address(0),
+                postTransferOutData: "",
+                program: program
+            })
+        );
     }
 
     function _min(uint256 a, uint256 b) internal pure returns (uint256) {

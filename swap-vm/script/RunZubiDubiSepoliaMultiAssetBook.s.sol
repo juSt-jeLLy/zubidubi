@@ -66,8 +66,13 @@ contract RunZubiDubiSepoliaMultiAssetBook is Script {
         ZubiDubiConfig.TokenConfig memory quoteAsset,
         uint40 maturity,
         uint256 index
-    ) private pure returns (bytes memory) {
-        bytes memory args = AquaExitTermArgsBuilder.build(AquaExitTermArgsBuilder.Args({
+    )
+        private
+        pure
+        returns (bytes memory)
+    {
+        bytes memory args = AquaExitTermArgsBuilder.build(
+            AquaExitTermArgsBuilder.Args({
                 baseDiscountBps: uint32(50 + index * 15),
                 annualRateBps: uint32(500 + index * 90),
                 maxDiscountBps: uint32(800 + index * 200),
@@ -90,36 +95,42 @@ contract RunZubiDubiSepoliaMultiAssetBook is Script {
                 maxDeviationBps: 0,
                 deviationHaircutBps: 0,
                 curveFamily: 1,
-                convexityBps: uint32(1_000 + index * 750)
-        }));
+                convexityBps: uint32(1000 + index * 750)
+            })
+        );
 
         return bytes.concat(
-            abi.encodePacked(OP_AQUA_EXIT_BACKING_ORACLE_CHECK, uint8(args.length)), args,
-            abi.encodePacked(OP_AQUA_EXIT_EXPOSURE_CAP, uint8(args.length)), args,
-            abi.encodePacked(OP_AQUA_EXIT_DISCOUNT_CURVE_1D, uint8(args.length)), args
+            abi.encodePacked(OP_AQUA_EXIT_BACKING_ORACLE_CHECK, uint8(args.length)),
+            args,
+            abi.encodePacked(OP_AQUA_EXIT_EXPOSURE_CAP, uint8(args.length)),
+            args,
+            abi.encodePacked(OP_AQUA_EXIT_DISCOUNT_CURVE_1D, uint8(args.length)),
+            args
         );
     }
 
     function _order(address maker, bytes memory program) private pure returns (ISwapVM.Order memory) {
-        return MakerTraitsLib.build(MakerTraitsLib.Args({
-            maker: maker,
-            shouldUnwrapWeth: false,
-            useAquaInsteadOfSignature: true,
-            allowZeroAmountIn: false,
-            receiver: address(0),
-            hasPreTransferInHook: false,
-            hasPostTransferInHook: false,
-            hasPreTransferOutHook: false,
-            hasPostTransferOutHook: false,
-            preTransferInTarget: address(0),
-            preTransferInData: "",
-            postTransferInTarget: address(0),
-            postTransferInData: "",
-            preTransferOutTarget: address(0),
-            preTransferOutData: "",
-            postTransferOutTarget: address(0),
-            postTransferOutData: "",
-            program: program
-        }));
+        return MakerTraitsLib.build(
+            MakerTraitsLib.Args({
+                maker: maker,
+                shouldUnwrapWeth: false,
+                useAquaInsteadOfSignature: true,
+                allowZeroAmountIn: false,
+                receiver: address(0),
+                hasPreTransferInHook: false,
+                hasPostTransferInHook: false,
+                hasPreTransferOutHook: false,
+                hasPostTransferOutHook: false,
+                preTransferInTarget: address(0),
+                preTransferInData: "",
+                postTransferInTarget: address(0),
+                postTransferInData: "",
+                preTransferOutTarget: address(0),
+                preTransferOutData: "",
+                postTransferOutTarget: address(0),
+                postTransferOutData: "",
+                program: program
+            })
+        );
     }
 }

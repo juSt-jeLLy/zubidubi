@@ -77,11 +77,21 @@ library ZubiDubiConfig {
     }
 
     function sepoliaMaturingReceiptAsset(uint256 index) internal pure returns (TokenConfig memory) {
-        if (index == 0) return _sepoliaPtZbEth("PT-zbETH-30D", SEPOLIA_PT_ZBETH_30D);
-        if (index == 1) return _sepoliaPtZbEth("PT-zbETH-60D", SEPOLIA_PT_ZBETH_60D);
-        if (index == 2) return _sepoliaPtZbEth("PT-zbETH-90D", SEPOLIA_PT_ZBETH_90D);
-        if (index == 3) return _sepoliaPtZbEth("PT-zbETH-180D", SEPOLIA_PT_ZBETH_180D);
-        if (index == 4) return _sepoliaPtZbEth("PT-zbETH-360D", SEPOLIA_PT_ZBETH_360D);
+        if (index == 0) {
+            return _sepoliaPtZbEth("PT-zbETH-30D", SEPOLIA_PT_ZBETH_30D);
+        }
+        if (index == 1) {
+            return _sepoliaPtZbEth("PT-zbETH-60D", SEPOLIA_PT_ZBETH_60D);
+        }
+        if (index == 2) {
+            return _sepoliaPtZbEth("PT-zbETH-90D", SEPOLIA_PT_ZBETH_90D);
+        }
+        if (index == 3) {
+            return _sepoliaPtZbEth("PT-zbETH-180D", SEPOLIA_PT_ZBETH_180D);
+        }
+        if (index == 4) {
+            return _sepoliaPtZbEth("PT-zbETH-360D", SEPOLIA_PT_ZBETH_360D);
+        }
         revert("ZubiDubiConfig: unknown Sepolia maturing asset");
     }
 
@@ -96,10 +106,7 @@ library ZubiDubiConfig {
         });
     }
 
-    function _sepoliaPtZbEth(
-        string memory symbol,
-        address token
-    ) private pure returns (TokenConfig memory) {
+    function _sepoliaPtZbEth(string memory symbol, address token) private pure returns (TokenConfig memory) {
         return TokenConfig({
             symbol: symbol,
             token: token,
