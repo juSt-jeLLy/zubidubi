@@ -9,9 +9,9 @@ ZubiDubi lets a seller exit a delayed asset such as an LRT withdrawal receipt, P
 - Aqua: `0x4D70dD3B2594A8AeD0544CE0434A2f93E27931AB`
 - AquaSwapVMRouter: `0xc8a540840D23398fF44B4a20Cbc612d3b0ED0ECc`
 - ZubiDubiRouteExecutor: `0xF6AA860E4d48BDEe0e1ec9B794ebB6ce1B0D00d2`
-- ZubiDubiExitReceipt: `0x77ACf02293f802DF621d5ff0077e410dCf05C2fa`
+- ZubiDubiExitReceipt: `0x8a0D1a9Df2808A35EEa759905baf7BF121BAC4E1`
 - Subgraph Studio: `https://thegraph.com/studio/subgraph/zubidubi`
-- Subgraph endpoint: `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.4.0`
+- Subgraph endpoint: `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.5.2`
 
 ## Graph-Backed Solver
 
@@ -52,10 +52,11 @@ This is the Graph-composability upgrade path: Substreams handles fast cross-chai
 
 ## Current Proof
 
-- Real routed Sepolia fill: `0x845229237df8a77690fcd59fd753f4cfe7491f60379d7eb8f7e00246c62ce0ce`
+- Real routed Sepolia fill: `0x697047208682ae61d28f910a45aa9f19c58a72c3a34ff34d4ab0c86a072236eb`
 - Demo sold `0.003 zbETH`.
-- Seller received `7.256317 USDC` net.
+- Seller received `7.244199 USDC` net.
 - DAO/protocol fee is indexed by the live subgraph.
+- Sepolia `zbETH` was issued by depositing `0.003 WETH` into the receipt contract, so the onchain demo token is backed before it is sold.
 
 ## Real Asset Fork Proof
 

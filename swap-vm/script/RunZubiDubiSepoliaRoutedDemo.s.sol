@@ -14,6 +14,11 @@ import { ZubiDubiDemoSeller } from "../src/ZubiDubiDemoSeller.sol";
 import { ZubiDubiRouteExecutor } from "../src/ZubiDubiRouteExecutor.sol";
 import { ZubiDubiConfig } from "./ZubiDubiConfig.sol";
 
+interface IWETH {
+    function deposit() external payable;
+    function approve(address spender, uint256 amount) external returns (bool);
+}
+
 contract RunZubiDubiSepoliaRoutedDemo is Script {
     uint8 private constant OP_AQUA_EXIT_BACKING_ORACLE_CHECK = 0x24;
     uint8 private constant OP_AQUA_EXIT_EXPOSURE_CAP = 0x25;
@@ -44,7 +49,9 @@ contract RunZubiDubiSepoliaRoutedDemo is Script {
         vm.startBroadcast(deployerPk);
 
         ZubiDubiDemoSeller seller = new ZubiDubiDemoSeller(routeExecutor, maker);
-        receipt.mint(address(seller), 0.003 ether);
+        IWETH(config.weth).deposit{ value: 0.003 ether }();
+        IWETH(config.weth).approve(address(receipt), 0.003 ether);
+        receipt.issue(0.003 ether, address(seller));
         usdc.approve(address(aqua), type(uint256).max);
 
         _ship(aqua, router, orders[0], receiptAsset.token, quoteAsset.token, 0.002 ether, 100e6);
@@ -89,6 +96,7 @@ contract RunZubiDubiSepoliaRoutedDemo is Script {
         console2.log("Seller USDC after:", usdc.balanceOf(address(seller)));
         console2.log("Seller receipt before:", sellerReceiptBefore);
         console2.log("Seller receipt after:", receipt.balanceOf(address(seller)));
+        console2.log("Receipt underlying WETH backing:", IERC20(config.weth).balanceOf(address(receipt)));
     }
 
     function _ship(

@@ -72,7 +72,7 @@ export function loadToken(address: Address): Token {
     token.symbol = symbolFor(address)
     token.name = token.symbol
     token.decimals = decimalsFor(address)
-    token.isReceipt = address.equals(Address.fromString('0x77ACf02293f802DF621d5ff0077e410dCf05C2fa'))
+    token.isReceipt = address.equals(Address.fromString('0x8a0d1a9df2808a35eea759905baf7bf121bac4e1'))
     token.save()
   }
   return token

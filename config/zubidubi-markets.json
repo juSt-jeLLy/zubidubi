@@ -4,7 +4,7 @@
     "mode": "public-testnet-demo",
     "baseAsset": {
       "symbol": "zbETH",
-      "address": "0x77ACf02293f802DF621d5ff0077e410dCf05C2fa",
+      "address": "0x8a0D1a9Df2808A35EEa759905baf7BF121BAC4E1",
       "decimals": 18,
       "assetType": "ZubiDubi delayed-redemption receipt",
       "oracle": "0x694AA1769357215DE4FAC081bf1f309aDC325306",

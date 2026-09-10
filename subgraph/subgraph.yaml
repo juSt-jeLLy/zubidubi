@@ -10,7 +10,7 @@ dataSources:
     source:
       address: "0x4D70dD3B2594A8AeD0544CE0434A2f93E27931AB"
       abi: Aqua
-      startBlock: 11673656
+      startBlock: 11674580
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -39,7 +39,7 @@ dataSources:
     source:
       address: "0xc8a540840D23398fF44B4a20Cbc612d3b0ED0ECc"
       abi: AquaSwapVMRouter
-      startBlock: 11673657
+      startBlock: 11674580
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -64,7 +64,7 @@ dataSources:
     source:
       address: "0xF6AA860E4d48BDEe0e1ec9B794ebB6ce1B0D00d2"
       abi: ZubiDubiRouteExecutor
-      startBlock: 11673659
+      startBlock: 11674580
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -90,9 +90,9 @@ dataSources:
     name: ZubiDubiExitReceipt
     network: sepolia
     source:
-      address: "0x77ACf02293f802DF621d5ff0077e410dCf05C2fa"
+      address: "0x8a0D1a9Df2808A35EEa759905baf7BF121BAC4E1"
       abi: ZubiDubiExitReceipt
-      startBlock: 11673658
+      startBlock: 11674580
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9

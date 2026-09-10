@@ -28,7 +28,7 @@ npm run deploy:studio
 Live Studio endpoint:
 
 ```text
-https://api.studio.thegraph.com/query/1760034/zubidubi/v0.4.0
+https://api.studio.thegraph.com/query/1760034/zubidubi/v0.5.2
 ```
 
 Run a live provider query:
@@ -50,18 +50,18 @@ That command queries active strategies from this live subgraph, decodes the inde
 - Aqua: `0x4D70dD3B2594A8AeD0544CE0434A2f93E27931AB`
 - AquaSwapVMRouter: `0xc8a540840D23398fF44B4a20Cbc612d3b0ED0ECc`
 - ZubiDubiRouteExecutor: `0xF6AA860E4d48BDEe0e1ec9B794ebB6ce1B0D00d2`
-- ZubiDubiExitReceipt: `0x77ACf02293f802DF621d5ff0077e410dCf05C2fa`
-- Start block: `11673656`
+- ZubiDubiExitReceipt: `0x8a0D1a9Df2808A35EEa759905baf7BF121BAC4E1`
+- Start block: `11674580`
 
 ## Live Proof Transactions
 
 - Deploy Aqua: `0xfebad005fcdd19f4e3e6014e588940efb8a72934313e6e03d1988ae89ea2987a`
 - Deploy AquaSwapVMRouter: `0xa95c8c6d3604b992e5affefe001c6508f2f85585ec95628cd6814cc1b9c823a0`
-- Deploy ZubiDubiExitReceipt: `0x79d547f3951e536b70cddd2e8786a111141cae00ca17a9dbdbfaeeea06bc1bb9`
+- Deploy ZubiDubiExitReceipt: `0x2452b740ba60d4ae8649f739303007c0b41f019763737a527879270533a39436`
 - Deploy ZubiDubiRouteExecutor: `0x6336c7f26fac0582ec0ff74355295d7ba07eced6ec51e7f4762ea81dc390d424`
-- Routed Sepolia demo final sell transaction: `0x845229237df8a77690fcd59fd753f4cfe7491f60379d7eb8f7e00246c62ce0ce`
+- Routed Sepolia demo final sell transaction: `0x697047208682ae61d28f910a45aa9f19c58a72c3a34ff34d4ab0c86a072236eb`
 
-The modular routed demo sold `0.003 zbETH` and paid `7.256317 USDC` net to the seller.
+The modular routed demo issued `0.003 zbETH` by depositing `0.003 WETH` into the receipt contract, then sold that backed maturing receipt for `7.244199 USDC` net to the seller.
 
 ## Where This Improves ZubiDubi
 

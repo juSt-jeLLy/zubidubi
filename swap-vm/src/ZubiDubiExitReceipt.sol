@@ -16,6 +16,7 @@ contract ZubiDubiExitReceipt is ERC20, Ownable {
     uint256 public immutable assetsPerReceipt;
 
     error ZubiDubiExitReceiptNotMatured(uint256 currentTime, uint40 maturity);
+    error ZubiDubiExitReceiptZeroReceiver();
 
     constructor(
         address owner,
@@ -34,8 +35,20 @@ contract ZubiDubiExitReceipt is ERC20, Ownable {
         _mint(to, amount);
     }
 
+    function issue(uint256 assets, address receiver) external returns (uint256 receiptAmount) {
+        if (receiver == address(0)) revert ZubiDubiExitReceiptZeroReceiver();
+
+        receiptAmount = previewIssue(assets);
+        underlying.safeTransferFrom(msg.sender, address(this), assets);
+        _mint(receiver, receiptAmount);
+    }
+
     function fund(uint256 assets) external {
         underlying.safeTransferFrom(msg.sender, address(this), assets);
+    }
+
+    function previewIssue(uint256 assets) public view returns (uint256 receiptAmount) {
+        receiptAmount = assets * 1e18 / assetsPerReceipt;
     }
 
     function previewRedeem(uint256 receiptAmount) public view returns (uint256 assets) {

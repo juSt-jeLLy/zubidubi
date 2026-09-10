@@ -14,6 +14,11 @@ import { ZubiDubiExitReceipt } from "../src/ZubiDubiExitReceipt.sol";
 import { ZubiDubiDemoTaker } from "../src/ZubiDubiDemoTaker.sol";
 import { ZubiDubiConfig } from "./ZubiDubiConfig.sol";
 
+interface IWETH {
+    function deposit() external payable;
+    function approve(address spender, uint256 amount) external returns (bool);
+}
+
 contract RunZubiDubiSepoliaDemo is Script {
     uint8 private constant OP_AQUA_EXIT_BACKING_ORACLE_CHECK = 0x24;
     uint8 private constant OP_AQUA_EXIT_EXPOSURE_CAP = 0x25;
@@ -45,7 +50,9 @@ contract RunZubiDubiSepoliaDemo is Script {
 
         ZubiDubiDemoTaker taker = new ZubiDubiDemoTaker(aqua, router, maker);
 
-        receipt.mint(address(taker), RECEIPT_TO_SELL);
+        IWETH(config.weth).deposit{ value: RECEIPT_TO_SELL }();
+        IWETH(config.weth).approve(address(receipt), RECEIPT_TO_SELL);
+        receipt.issue(RECEIPT_TO_SELL, address(taker));
         usdc.approve(address(aqua), type(uint256).max);
 
         address[] memory tokens = new address[](2);
@@ -103,6 +110,7 @@ contract RunZubiDubiSepoliaDemo is Script {
         console2.log("Taker USDC after:", takerUsdcAfter);
         console2.log("Taker receipt before:", takerReceiptBefore);
         console2.log("Taker receipt after:", takerReceiptAfter);
+        console2.log("Receipt underlying WETH backing:", IERC20(config.weth).balanceOf(address(receipt)));
     }
 
     function _program(

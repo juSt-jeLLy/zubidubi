@@ -12,7 +12,7 @@ const deployment = JSON.parse(readFileSync(join(root, 'swap-vm/deployments/sepol
 
 const endpoint =
   process.env.ZUBIDUBI_SUBGRAPH_ENDPOINT ||
-  'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.4.0'
+  'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.5.2'
 const rpcUrl = process.env.SEPOLIA_RPC_URL || process.env.RPC_URL
 const tokenIn = normalize(process.env.ZUBIDUBI_TOKEN_IN || deployment.exitReceipt)
 const tokenOut = normalize(process.env.ZUBIDUBI_TOKEN_OUT || deployment.usdc)

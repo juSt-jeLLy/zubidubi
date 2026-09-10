@@ -9,17 +9,14 @@ describe('AquaXycAmmStrategy Examples', () => {
   it('Example: Minimal AMM', () => {
     const program = AquaXYCAmmStrategy.new().build()
 
-    expect(program.toString()).toBe('0x1100')
+    expect(program.toString()).toBe('0x1200')
   })
 
   it('Example: AMM with fee', () => {
     const program = AquaXYCAmmStrategy.new().withFeeTokenIn(0.00003).build()
 
-    const flatFeeInInstructionIndex = 21
-
     const hex = program.toString()
-    expect(hex).toContain(flatFeeInInstructionIndex.toString(16))
-    expect(hex).toContain('10')
+    expect(hex).toBe('0x1604000000031200')
   })
 
   it('Example: Concentrated liquidity', () => {

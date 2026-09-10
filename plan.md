@@ -93,7 +93,7 @@ A taker holds a delayed-redemption asset and wants liquid tokens now.
 Examples:
 
 - Sell an LRT during stress for USDC now.
-- Sell a mock withdrawal receipt redeemable for 1 WETH in 14 days.
+- Sell a mock withdrawal receipt redeemable for 1 WETH after maturity.
 - Sell a PT token before maturity.
 - Sell a vault withdrawal share before the next withdrawal epoch.
 
@@ -573,15 +573,16 @@ Completed so far:
 - The Graph subgraph is deployed on Subgraph Studio and indexes Aqua strategies, SwapVM fills, ZubiDubi routes, maker skips, receipt lifecycle, maker exposure, and DAO/protocol fees.
 - Graph-backed solver app script added at `scripts/zubidubi-graph-solver.mjs`; it queries live indexed strategies, decodes executable SwapVM orders, and uses Sepolia RPC for final `quoteExactIn` freshness checks.
 - Graph-backed solver quote validated against live Sepolia: it found 3 indexed strategies and quoted a 0.003 zbETH exit through `ZubiDubiRouteExecutor` using Graph-discovered order data.
-- Upgraded Graph layer to `v0.4.0` with a solver-grade market book, per-route maker fills, execution price history, strategy snapshots, market-level volume, market-level exposure, and market-level DAO fee accrual.
-- Deployed the upgraded Subgraph Studio version at `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.4.0` and validated live queries against real Sepolia events.
+- Upgraded Graph layer to `v0.5.2` with a solver-grade market book, per-route maker fills, execution price history, strategy snapshots, market-level volume, market-level exposure, and market-level DAO fee accrual.
+- Deployed the upgraded Subgraph Studio version at `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.5.2` and validated live queries against real Sepolia events.
 - Added reusable Aqua Liquidity Substreams package at `substreams/aqua-liquidity`; it extracts standardized Aqua `SHIPPED`, `PUSHED`, `PULLED`, and `DOCKED` events from EVM blocks, compiles with `cargo check`, and builds successfully to `wasm32-unknown-unknown`.
 - Built AquaExit as a reusable SwapVM instruction library: backing/oracle validation, exposure-cap validation, and term-discount curve pricing. Sepolia demo scripts and the local TypeScript SDK build the modular sequence.
 - Kept the deployable ZubiDubi `AquaSwapVMRouter` under EIP-170 by pruning the unused Aqua `Extruction` opcode slot while leaving `Extruction` available elsewhere in the repo. Current production router runtime size is 23,624 bytes, with 952 bytes of margin.
 - Redeployed the modular-only instruction-library stack on Sepolia: Aqua, `AquaSwapVMRouter`, `ZubiDubiExitReceipt`, and `ZubiDubiRouteExecutor`.
 - Removed the old single AquaExit opcode from the production opcode table, SDK builder, SDK opcode list, tests, and strategy scripts. Slot `0x23` is reserved for index stability; all current contracts, tests, Sepolia scripts, SDK helpers, Graph-indexed strategies, and solver paths use the modular opcode sequence.
-- Executed a fresh modular routed Sepolia fill and redeployed the Subgraph Studio endpoint as `v0.4.0`; the root Graph-backed solver now queries the new subgraph, discovers 3 live strategies, and re-quotes through the new route executor.
-- Added a real-asset Pendle PT mainnet-fork proof. `ZubiDubiPendleMainnetForkTest` uses real `PT-USD3-17DEC2026` as `tokenIn`, real mainnet USDC as `tokenOut`, the PT's real Pendle maturity, and real Chainlink USDC/USD for par-value pricing. This turns the receipt story into a concrete maturing-asset market instead of only a custom demo receipt.
+- Executed a fresh modular routed Sepolia fill and redeployed the Subgraph Studio endpoint as `v0.5.2`; the root Graph-backed solver now queries the new subgraph, discovers 3 live strategies, and re-quotes through the new route executor.
+- Added a real-asset Pendle PT mainnet-fork proof. `ZubiDubiPendleMainnetForkTest` uses real `PT-USD3-17DEC2026` as `tokenIn`, real mainnet USDC as `tokenOut`, the PT's real Pendle maturity, and real Chainlink USDC/USD for par-value pricing. This turns the receipt story into a concrete maturing-asset market instead of only a backed Sepolia PT-style receipt.
+- Upgraded the Sepolia `zbETH` demo token into a PT-style backed receipt issuance path: demos now wrap real Sepolia ETH into WETH, deposit WETH into `ZubiDubiExitReceipt.issue()`, mint `zbETH`, and then sell that backed maturing token through Aqua before maturity.
 
 Next build targets:
 
@@ -746,14 +747,15 @@ Current Sepolia deployment:
 - Aqua: `0x4D70dD3B2594A8AeD0544CE0434A2f93E27931AB`.
 - AquaSwapVMRouter: `0xc8a540840D23398fF44B4a20Cbc612d3b0ED0ECc`.
 - ZubiDubiRouteExecutor: `0xF6AA860E4d48BDEe0e1ec9B794ebB6ce1B0D00d2`.
-- ZubiDubiExitReceipt: `0x77ACf02293f802DF621d5ff0077e410dCf05C2fa`.
+- ZubiDubiExitReceipt: `0x8a0D1a9Df2808A35EEa759905baf7BF121BAC4E1`.
 - Deploy Aqua tx: `0xfebad005fcdd19f4e3e6014e588940efb8a72934313e6e03d1988ae89ea2987a`.
 - Deploy AquaSwapVMRouter tx: `0xa95c8c6d3604b992e5affefe001c6508f2f85585ec95628cd6814cc1b9c823a0`.
-- Deploy ZubiDubiExitReceipt tx: `0x79d547f3951e536b70cddd2e8786a111141cae00ca17a9dbdbfaeeea06bc1bb9`.
+- Deploy ZubiDubiExitReceipt tx: `0x2452b740ba60d4ae8649f739303007c0b41f019763737a527879270533a39436`.
 - Deploy ZubiDubiRouteExecutor tx: `0x6336c7f26fac0582ec0ff74355295d7ba07eced6ec51e7f4762ea81dc390d424`.
-- Routed Sepolia demo final sell tx: `0x845229237df8a77690fcd59fd753f4cfe7491f60379d7eb8f7e00246c62ce0ce`.
-- Modular demo seller: `0x79bBf5789Bf20937E83ce26d9Ce9Df43D3EEeA6e`.
-- Modular demo result: sold `0.003 zbETH` for `7.256317 USDC` net.
+- Routed Sepolia demo final sell tx: `0x697047208682ae61d28f910a45aa9f19c58a72c3a34ff34d4ab0c86a072236eb`.
+- Modular demo seller: `0x0829F0E61262153368Bc38D227bc859D9Ab49D6A`.
+- Modular demo result: sold `0.003 zbETH` for `7.244199 USDC` net.
+- Receipt backing proof: `ZubiDubiExitReceipt` held `0.003 WETH` after issuing the sold `zbETH`.
 
 Current mainnet-fork real asset:
 
@@ -793,12 +795,13 @@ Current mainnet-fork real asset:
 Live Sepolia routed proof:
 
 - Route executor: `0xF6AA860E4d48BDEe0e1ec9B794ebB6ce1B0D00d2`.
-- Seller contract: `0x79bBf5789Bf20937E83ce26d9Ce9Df43D3EEeA6e`.
-- Routed swap transaction: `0x845229237df8a77690fcd59fd753f4cfe7491f60379d7eb8f7e00246c62ce0ce`.
+- Seller contract: `0x0829F0E61262153368Bc38D227bc859D9Ab49D6A`.
+- Routed swap transaction: `0x697047208682ae61d28f910a45aa9f19c58a72c3a34ff34d4ab0c86a072236eb`.
 - Seller sold `0.003 zbETH`.
-- Seller received `7.256317 USDC`.
+- Seller received `7.244199 USDC`.
 - Maker wallet received the delayed-exit receipt exposure.
-- The live Graph-backed solver now discovers the 3 indexed modular strategies from `v0.4.0` and re-quotes the next 0.003 zbETH exit at `7.200773 USDC` net after inventory/exposure repricing.
+- The sold `zbETH` was issued through `issue()` after depositing `0.003 WETH`, making the Sepolia demo asset a backed maturing claim instead of an unbacked mint.
+- The live Graph-backed solver now discovers the 3 indexed modular strategies from `v0.5.2` and re-quotes the next 0.003 zbETH exit at `7.188748 USDC` net after inventory/exposure repricing.
 
 ## Final submission story
 

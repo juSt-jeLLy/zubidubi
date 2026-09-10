@@ -26,6 +26,39 @@ contract ZubiDubiExitReceiptTest is Test {
     }
 
     function test_ZubiDubiExitReceipt_RedeemsUnderlyingOnlyAfterMaturity() public {
+        weth.mint(seller, 2 ether);
+        vm.prank(seller);
+        weth.approve(address(receipt), 2 ether);
+        vm.prank(seller);
+        uint256 receiptAmount = receipt.issue(2 ether, seller);
+
+        assertEq(receiptAmount, 2 ether);
+        assertEq(weth.balanceOf(address(receipt)), 2 ether);
+        assertEq(receipt.balanceOf(seller), 2 ether);
+        assertEq(receipt.previewIssue(2 ether), 2 ether);
+        assertEq(receipt.previewRedeem(2 ether), 2 ether);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ZubiDubiExitReceipt.ZubiDubiExitReceiptNotMatured.selector,
+                block.timestamp,
+                uint40(block.timestamp + 30 days)
+            )
+        );
+        vm.prank(seller);
+        receipt.redeem(2 ether, seller);
+
+        vm.warp(block.timestamp + 30 days);
+
+        vm.prank(seller);
+        uint256 assets = receipt.redeem(2 ether, seller);
+
+        assertEq(assets, 2 ether);
+        assertEq(receipt.balanceOf(seller), 0);
+        assertEq(weth.balanceOf(seller), 2 ether);
+    }
+
+    function test_ZubiDubiExitReceipt_OwnerCanFundAndMintForFixtures() public {
         vm.prank(owner);
         receipt.mint(seller, 2 ether);
 
