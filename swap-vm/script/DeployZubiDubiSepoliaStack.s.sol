@@ -11,10 +11,14 @@ import { ZubiDubiRouteExecutor } from "../src/ZubiDubiRouteExecutor.sol";
 import { ZubiDubiExitReceipt } from "../src/ZubiDubiExitReceipt.sol";
 import { ZubiDubiConfig } from "./ZubiDubiConfig.sol";
 
-contract DeployZubiDubiSepolia is Script {
+// Deploys Router + Receipt + RouteExecutor against an already-deployed Aqua.
+contract DeployZubiDubiSepoliaStack is Script {
     function run() external {
         ZubiDubiConfig.NetworkConfig memory config = ZubiDubiConfig.sepolia();
-        require(block.chainid == config.chainId, "DeployZubiDubiSepolia: wrong chain");
+        require(block.chainid == config.chainId, "DeployZubiDubiSepoliaStack: wrong chain");
+
+        // The Aqua deployed in the previous step.
+        address aquaAddress = vm.envOr("ZUBIDUBI_AQUA", config.aqua);
 
         uint256 deployerPrivateKey = vm.envUint("SEPOLIA_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
@@ -22,9 +26,8 @@ contract DeployZubiDubiSepolia is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        Aqua aqua = new Aqua();
         AquaSwapVMRouter router = new AquaSwapVMRouter(
-            address(aqua),
+            aquaAddress,
             config.weth,
             owner,
             "ZubiDubiAquaSwapVMRouter",
@@ -38,23 +41,26 @@ contract DeployZubiDubiSepolia is Script {
             "ZubiDubi Principal Token (PT) backed by WETH",
             "PT-zbETH"
         );
-        ZubiDubiRouteExecutor routeExecutor = new ZubiDubiRouteExecutor(aqua, router, owner, 10, 8);
+        ZubiDubiRouteExecutor routeExecutor = new ZubiDubiRouteExecutor(
+            Aqua(aquaAddress),
+            router,
+            owner,
+            10,
+            8
+        );
 
         vm.stopBroadcast();
 
-        console2.log("ZubiDubi Sepolia Aqua:", address(aqua));
+        console2.log("ZubiDubi Sepolia Aqua:", aquaAddress);
         console2.log("ZubiDubi Sepolia AquaSwapVMRouter:", address(router));
         console2.log("ZubiDubi Sepolia RouteExecutor:", address(routeExecutor));
         console2.log("ZubiDubi Sepolia ExitReceipt:", address(receipt));
-        console2.log("Sepolia WETH:", config.weth);
-        console2.log("Sepolia USDC:", config.usdc);
-        console2.log("Sepolia Chainlink ETH/USD:", config.chainlinkEthUsd);
 
         string memory root = "zubidubi";
         string memory json = vm.serializeUint(root, "chainId", block.chainid);
         json = vm.serializeAddress(root, "deployer", deployer);
         json = vm.serializeAddress(root, "owner", owner);
-        json = vm.serializeAddress(root, "aqua", address(aqua));
+        json = vm.serializeAddress(root, "aqua", aquaAddress);
         json = vm.serializeAddress(root, "aquaSwapVMRouter", address(router));
         json = vm.serializeAddress(root, "routeExecutor", address(routeExecutor));
         json = vm.serializeAddress(root, "exitReceipt", address(receipt));

@@ -206,7 +206,12 @@ contract ZubiDubiDemoTest is AquaSwapVMTest {
             minMaturity: 0,
             maxMaturity: type(uint40).max,
             allowedTokenIn: address(exitReceipt),
-            allowedTokenOut: address(usdc)
+            allowedTokenOut: address(usdc),
+            secondaryOracleAddress: address(0),
+            maxDeviationBps: 0,
+            deviationHaircutBps: 0,
+            curveFamily: 0,
+            convexityBps: 0
         }));
     }
 

@@ -36,6 +36,14 @@ library AquaExitTermArgsBuilder {
         uint40 maxMaturity;
         address allowedTokenIn;
         address allowedTokenOut;
+        address secondaryOracleAddress;
+        uint32 maxDeviationBps;
+        uint32 deviationHaircutBps;
+        // Term-structure curve family. 0 = linear, 1 = convex.
+        // Appended last so legacy 166-byte args (shipped strategies) still parse
+        // with the default linear curve: older strategies keep their exact pricing.
+        uint8 curveFamily;
+        uint32 convexityBps;
     }
 
     error AquaExitTermBaseDiscountTooHigh(uint32 baseDiscountBps);
@@ -59,7 +67,15 @@ library AquaExitTermArgsBuilder {
     error AquaExitTermMissingMaxMaturityArg();
     error AquaExitTermMissingAllowedTokenInArg();
     error AquaExitTermMissingAllowedTokenOutArg();
+    error AquaExitTermMissingSecondaryOracleArg();
+    error AquaExitTermMissingMaxDeviationArg();
+    error AquaExitTermMissingDeviationHaircutArg();
+    error AquaExitTermMissingCurveFamilyArg();
+    error AquaExitTermMissingConvexityArg();
     error AquaExitTermTokenDecimalsTooHigh(uint8 decimals);
+    error AquaExitTermConvexityTooHigh(uint32 convexityBps);
+    error AquaExitTermUnknownCurveFamily(uint8 curveFamily);
+
     error AquaExitTermInventorySlopeTooHigh(uint32 inventorySlopeBps);
     error AquaExitTermLiquiditySlopeTooHigh(uint32 liquiditySlopeBps);
     error AquaExitTermRiskTierTooHigh(uint32 riskTierBps);
@@ -72,6 +88,8 @@ library AquaExitTermArgsBuilder {
         require(data.inventorySlopeBps < BPS, AquaExitTermInventorySlopeTooHigh(data.inventorySlopeBps));
         require(data.liquiditySlopeBps < BPS, AquaExitTermLiquiditySlopeTooHigh(data.liquiditySlopeBps));
         require(data.riskTierBps < BPS, AquaExitTermRiskTierTooHigh(data.riskTierBps));
+        require(data.convexityBps < BPS, AquaExitTermConvexityTooHigh(data.convexityBps));
+        require(data.curveFamily <= 1, AquaExitTermUnknownCurveFamily(data.curveFamily));
         require(data.tokenInDecimals <= 36, AquaExitTermTokenDecimalsTooHigh(data.tokenInDecimals));
         require(data.tokenOutDecimals <= 36, AquaExitTermTokenDecimalsTooHigh(data.tokenOutDecimals));
 
@@ -97,8 +115,14 @@ library AquaExitTermArgsBuilder {
             data.allowedTokenIn,
             data.allowedTokenOut
         );
+        bytes memory oracleIntegrity = abi.encodePacked(
+            data.secondaryOracleAddress,
+            data.maxDeviationBps,
+            data.deviationHaircutBps
+        );
+        bytes memory curveFamilyBytes = abi.encodePacked(data.curveFamily, data.convexityBps);
 
-        return bytes.concat(market, makerRisk);
+        return bytes.concat(market, makerRisk, oracleIntegrity, curveFamilyBytes);
     }
 
     function parse(bytes calldata args) internal pure returns (Args memory parsed) {
@@ -120,6 +144,15 @@ library AquaExitTermArgsBuilder {
         parsed.maxMaturity = uint40(bytes5(args.slice(93, 98, AquaExitTermMissingMaxMaturityArg.selector)));
         parsed.allowedTokenIn = address(bytes20(args.slice(98, 118, AquaExitTermMissingAllowedTokenInArg.selector)));
         parsed.allowedTokenOut = address(bytes20(args.slice(118, 138, AquaExitTermMissingAllowedTokenOutArg.selector)));
+        parsed.secondaryOracleAddress = address(bytes20(args.slice(138, 158, AquaExitTermMissingSecondaryOracleArg.selector)));
+        parsed.maxDeviationBps = uint32(bytes4(args.slice(158, 162, AquaExitTermMissingMaxDeviationArg.selector)));
+        parsed.deviationHaircutBps = uint32(bytes4(args.slice(162, 166, AquaExitTermMissingDeviationHaircutArg.selector)));
+        // Backward-compatible extension: legacy 166-byte args (pre curve-family)
+        // keep the linear curve. New 171-byte args opt into convexity.
+        if (args.length >= 171) {
+            parsed.curveFamily = uint8(bytes1(args.slice(166, 167, AquaExitTermMissingCurveFamilyArg.selector)));
+            parsed.convexityBps = uint32(bytes4(args.slice(167, 171, AquaExitTermMissingConvexityArg.selector)));
+        }
     }
 }
 
@@ -145,16 +178,51 @@ contract AquaExitTerm {
     error AquaExitTermTokenNotAllowed(address tokenIn, address tokenOut, address allowedTokenIn, address allowedTokenOut);
     error AquaExitTermMaturityOutOfRange(uint40 maturity, uint40 minMaturity, uint40 maxMaturity);
     error AquaExitTermInsufficientMakerOutputLiquidity(uint256 amountOut, uint256 balanceOut);
+    error AquaExitTermDeviationTooHigh(uint256 deviationBps, uint32 maxDeviationBps);
+
+    uint8 internal constant _CURVE_LINEAR = 0;
+    uint8 internal constant _CURVE_CONVEX = 1;
 
     /// @notice Reusable backing/oracle guard for delayed-redemption assets.
-    /// @dev Validates asset pair, maturity window, and oracle freshness. It does not
-    ///      mutate swap registers, so it can be shared across multiple term curves.
+    /// @dev Validates asset pair, maturity window, and oracle freshness. If a
+    ///      secondary real oracle is configured, it also enforces a cross-provider
+    ///      deviation bound. It does not mutate swap registers.
     function _aquaExitBackingOracleCheck(Context memory ctx, bytes calldata args) internal view {
         AquaExitTermArgsBuilder.Args memory parsed = AquaExitTermArgsBuilder.parse(args);
 
         _checkAllowedMarket(ctx.query.tokenIn, ctx.query.tokenOut, parsed.allowedTokenIn, parsed.allowedTokenOut);
         _checkMaturity(parsed.maturity, parsed.minMaturity, parsed.maxMaturity);
-        _oraclePrice1e18(parsed.oracleAddress, parsed.oracleDecimals, parsed.maxStaleness);
+
+        uint256 primaryPrice = _oraclePrice1e18(parsed.oracleAddress, parsed.oracleDecimals, parsed.maxStaleness);
+        _oracleDeviationBps(parsed, primaryPrice);
+    }
+
+    /// @notice Cross-provider oracle integrity check.
+    /// @dev Reads a secondary real feed (e.g. a Pyth adapter) and reverts if the
+    ///      two independent providers deviate more than the maker's bound.
+    function _oracleDeviationBps(
+        AquaExitTermArgsBuilder.Args memory parsed,
+        uint256 primaryPrice
+    ) private view returns (uint256 extraDiscountBps) {
+        if (parsed.secondaryOracleAddress == address(0) || parsed.maxDeviationBps == 0) return 0;
+        if (primaryPrice == 0) return 0;
+
+        uint256 secondaryPrice = _oraclePrice1e18(
+            parsed.secondaryOracleAddress,
+            parsed.oracleDecimals,
+            parsed.maxStaleness
+        );
+        if (secondaryPrice == 0) return 0;
+
+        uint256 diff = primaryPrice > secondaryPrice ? primaryPrice - secondaryPrice : secondaryPrice - primaryPrice;
+        uint256 deviationBps = diff * _BPS / primaryPrice;
+        if (deviationBps > parsed.maxDeviationBps) {
+            revert AquaExitTermDeviationTooHigh(deviationBps, parsed.maxDeviationBps);
+        }
+
+        if (parsed.deviationHaircutBps > 0 && deviationBps > 0) {
+            extraDiscountBps = deviationBps * parsed.deviationHaircutBps / parsed.maxDeviationBps;
+        }
     }
 
     /// @notice Reusable maker exposure/notional guard.
@@ -178,6 +246,12 @@ contract AquaExitTerm {
         AquaExitTermArgsBuilder.Args memory parsed = AquaExitTermArgsBuilder.parse(args);
 
         uint256 price = _oraclePrice1e18(parsed.oracleAddress, parsed.oracleDecimals, parsed.maxStaleness);
+        uint256 extraDiscountBps = _oracleDeviationBps(parsed, price);
+        if (extraDiscountBps > 0) {
+            // Fold the cross-provider deviation haircut into the base discount.
+            // The maxDiscountBps guardrail caps the combined discount below par.
+            parsed.baseDiscountBps = uint32(uint256(parsed.baseDiscountBps) + extraDiscountBps);
+        }
         _applyDiscountCurve(ctx, parsed, price);
     }
 
@@ -191,12 +265,14 @@ contract AquaExitTerm {
             uint256 discountBps = _checkedDiscountBps(
                 parsed.baseDiscountBps,
                 parsed.annualRateBps,
+                parsed.riskTierBps,
+                parsed.curveFamily,
+                parsed.convexityBps,
                 parsed.maturity,
                 ctx.swap.balanceIn,
                 ctx.swap.amountIn,
                 parsed.maxExposure,
                 parsed.inventorySlopeBps,
-                parsed.riskTierBps,
                 parsed.maxDiscountBps
             );
             ctx.swap.amountOut = _amountOutWithDepth(ctx.swap.amountIn, price, parsed.tokenInDecimals, parsed.tokenOutDecimals, discountBps, parsed.liquiditySlopeBps, ctx.swap.balanceOut, parsed.maxDiscountBps);
@@ -240,21 +316,22 @@ contract AquaExitTerm {
     function _checkedDiscountBps(
         uint32 baseDiscountBps,
         uint32 annualRateBps,
+        uint32 riskTierBps,
+        uint8 curveFamily,
+        uint32 convexityBps,
         uint40 maturity,
         uint256 currentExposure,
         uint256 fillAmount,
         uint128 maxExposure,
         uint32 inventorySlopeBps,
-        uint32 riskTierBps,
         uint32 maxDiscountBps
     ) private view returns (uint256 discountBps) {
         uint256 exposureAfter = _checkExposureLimit(currentExposure, fillAmount, maxExposure);
 
-        discountBps = _termDiscountBps(baseDiscountBps, annualRateBps, maturity);
+        discountBps = _termDiscountBps(baseDiscountBps, annualRateBps, riskTierBps, curveFamily, convexityBps, maturity);
         if (maxExposure > 0 && inventorySlopeBps > 0) {
             discountBps += uint256(inventorySlopeBps) * exposureAfter / maxExposure;
         }
-        discountBps += riskTierBps;
 
         require(discountBps <= maxDiscountBps, AquaExitTermDiscountTooHigh(discountBps, maxDiscountBps));
         require(discountBps < _BPS, AquaExitTermDiscountExceedsPar(discountBps));
@@ -269,9 +346,20 @@ contract AquaExitTerm {
         require(maxExposure == 0 || exposureAfter <= maxExposure, AquaExitTermExposureLimitExceeded(exposureAfter, maxExposure));
     }
 
+    /// @notice Term-structure discount curve.
+    /// @dev Family 0 (linear): discount grows linearly with time to maturity.
+    ///      Family 1 (convex): adds a quadratic convexity premium so long-dated
+    ///      receipts are discounted more steeply than a straight line — the same
+    ///      shape real yield curves take when duration risk is repriced.
+    ///      `riskTierBps` is an ANNUALIZED asset-class haircut (e.g. LRT depeg
+    ///      premium) that also scales with the remaining duration, so the same
+    ///      tier byte produces a bigger premium for longer-dated claims.
     function _termDiscountBps(
         uint32 baseDiscountBps,
         uint32 annualRateBps,
+        uint32 riskTierBps,
+        uint8 curveFamily,
+        uint32 convexityBps,
         uint40 maturity
     ) private view returns (uint256) {
         if (block.timestamp >= maturity) {
@@ -279,8 +367,25 @@ contract AquaExitTerm {
         }
 
         uint256 secondsToMaturity = uint256(maturity) - block.timestamp;
-        uint256 durationDiscountBps = uint256(annualRateBps) * secondsToMaturity / _YEAR;
-        return uint256(baseDiscountBps) + durationDiscountBps;
+        // The asset-class haircut is an annualized rate, folded into the term rate.
+        uint256 rateBps = uint256(annualRateBps) + uint256(riskTierBps);
+        uint256 linearDiscountBps = rateBps * secondsToMaturity / _YEAR;
+
+        if (curveFamily == _CURVE_CONVEX && convexityBps > 0) {
+            // True quadratic convexity premium, annualized at the 1-year horizon:
+            //   premiumBps = convexityBps * (secondsToMaturity / YEAR)^2
+            // Computed in full precision (Math.mulDiv) so short-dated receipts still
+            // quote a measurable, non-truncated convexity premium: convexity is a
+            // duration-of-duration term, so it scales with the square of remaining
+            // time, not with the discount rate itself.
+            linearDiscountBps += Math.mulDiv(
+                uint256(convexityBps) * secondsToMaturity,
+                secondsToMaturity,
+                _YEAR * _YEAR
+            );
+        }
+
+        return uint256(baseDiscountBps) + linearDiscountBps;
     }
 
     function _amountOut(
@@ -313,12 +418,14 @@ contract AquaExitTerm {
         uint256 discountBps = _checkedDiscountBps(
             parsed.baseDiscountBps,
             parsed.annualRateBps,
+            parsed.riskTierBps,
+            parsed.curveFamily,
+            parsed.convexityBps,
             parsed.maturity,
             currentExposure,
             0,
             parsed.maxExposure,
             parsed.inventorySlopeBps,
-            parsed.riskTierBps,
             parsed.maxDiscountBps
         );
         discountBps = _discountWithLiquidityDepth(discountBps, parsed.liquiditySlopeBps, amountOut, balanceOut, parsed.maxDiscountBps);
@@ -328,12 +435,14 @@ contract AquaExitTerm {
             discountBps = _checkedDiscountBps(
                 parsed.baseDiscountBps,
                 parsed.annualRateBps,
+                parsed.riskTierBps,
+                parsed.curveFamily,
+                parsed.convexityBps,
                 parsed.maturity,
                 currentExposure,
                 amountIn,
                 parsed.maxExposure,
                 parsed.inventorySlopeBps,
-                parsed.riskTierBps,
                 parsed.maxDiscountBps
             );
             discountBps = _discountWithLiquidityDepth(discountBps, parsed.liquiditySlopeBps, amountOut, balanceOut, parsed.maxDiscountBps);

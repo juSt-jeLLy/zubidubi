@@ -253,12 +253,11 @@ The MVP can start with a simple linear discount. The bigger project can add rich
 
 Possible curve variants:
 
-- Linear term discount.
-- Piecewise term curve by maturity buckets.
-- Convex discount for long-dated receipts.
-- Oracle depeg haircut.
+- Linear term discount: **implemented (family 0, default).**
+- Piecewise/convex term curve: **implemented (family 1, convex)** — quadratic convexity premium for long-dated receipts, tuned with `convexityBps`.
+- Oracle depeg haircut: implemented (cross-provider deviation bound + haircut).
 - Queue-depth haircut.
-- Maker inventory/exposure skew.
+- Maker inventory/exposure skew: implemented.
 - Maker max notional and allowed asset-pair limits.
 - Maker maturity window limits.
 - Maker risk-tier haircut.
@@ -565,6 +564,10 @@ MVP UI can include:
 
 Completed so far:
 
+- **Convexity fixed + redeployed + proven live** (2026-09-10): the convex premium is now a true quadratic `convexityBps * (time/YEAR)^2` (full-precision `Math.mulDiv`, no truncation for short-dated/small-`convexityBps` strategies; regression test `test_AquaExitTerm_ConvexCurve_ShortDatedSmallConvexityStillQuotesPremium`). Hardened stack deployed at block `11676033`: router `0x3d39B155...` (24,337 B), executor `0x95d74BF2...`, receipt `0xb7877571...`. Live quote tape on the hardened stack shows convex gross `7.159886 USDC`, linear gross `7.111608 USDC`, and steep linear gross `6.966040 USDC`; the selected convex order executed in `0x77518aa1...db46da7` for `7.152727 USDC` net after the 10 bps DAO fee.
+- **Graph-backed solver gained submit-execute mode**: `ZUBIDUBI_EXECUTE=1 npm run zubidubi:graph-quote` discovers strategies from the live subgraph, quotes them, mints fresh backed receipts (WETH deposit -> `issue()`), and atomically executes `routeExactIn` — proven live on the hardened stack at block 11676051.
+- **Subgraph redeployed as `v0.8.0`** against the hardened stack (all datasources start at block `11676033`), synced to head: 3 active strategies, 1 routed fill indexed, solver re-quotes the next 0.003 zbETH exit at 7.104497 USDC net after inventory/exposure repricing.
+- Foundry invariant suites added: `test/invariants/AquaExitCurveInvariants.t.sol` (discount >= 0 and < par, amountOut monotonic in time, convex >= linear discount over a warped-time tape) and `test/invariants/ZubiDubiRouteInvariants.t.sol` (maker payouts capped at min(wallet, allowance), route atomicity, fee/recipient value conservation, same-maker multi-strategy dedup).
 - Official Aqua and SwapVM sources are vendored locally, with SwapVM based on the production `release/1.0.2` line and the SDK aligned to the official `swap-vm/v0.4.1` release.
 - Custom `AquaExitTerm` SwapVM instruction is implemented for maturity, oracle, exposure, liquidity, risk-tier, max-discount, max-notional, allowed-asset, and staleness checks.
 - Sepolia contracts are deployed for Aqua, modular-instruction `AquaSwapVMRouter`, `ZubiDubiExitReceipt`, and `ZubiDubiRouteExecutor`.
@@ -577,16 +580,17 @@ Completed so far:
 - Deployed the upgraded Subgraph Studio version at `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.5.2` and validated live queries against real Sepolia events.
 - Added reusable Aqua Liquidity Substreams package at `substreams/aqua-liquidity`; it extracts standardized Aqua `SHIPPED`, `PUSHED`, `PULLED`, and `DOCKED` events from EVM blocks, compiles with `cargo check`, and builds successfully to `wasm32-unknown-unknown`.
 - Built AquaExit as a reusable SwapVM instruction library: backing/oracle validation, exposure-cap validation, and term-discount curve pricing. Sepolia demo scripts and the local TypeScript SDK build the modular sequence.
-- Kept the deployable ZubiDubi `AquaSwapVMRouter` under EIP-170 by pruning the unused Aqua `Extruction` opcode slot while leaving `Extruction` available elsewhere in the repo. Current production router runtime size is 23,624 bytes, with 952 bytes of margin.
+- Kept the deployable ZubiDubi `AquaSwapVMRouter` under EIP-170 by pruning the unused Aqua `Extruction` opcode slot while leaving `Extruction` available elsewhere in the repo. The current convexity-fixed production router runtime is 24,337 bytes, with 239 bytes of margin.
 - Redeployed the modular-only instruction-library stack on Sepolia: Aqua, `AquaSwapVMRouter`, `ZubiDubiExitReceipt`, and `ZubiDubiRouteExecutor`.
 - Removed the old single AquaExit opcode from the production opcode table, SDK builder, SDK opcode list, tests, and strategy scripts. Slot `0x23` is reserved for index stability; all current contracts, tests, Sepolia scripts, SDK helpers, Graph-indexed strategies, and solver paths use the modular opcode sequence.
 - Executed a fresh modular routed Sepolia fill and redeployed the Subgraph Studio endpoint as `v0.5.2`; the root Graph-backed solver now queries the new subgraph, discovers 3 live strategies, and re-quotes through the new route executor.
+- Redeployed the subgraph as **`v0.8.0`** (start block `11676033`, synced to head) after the receipt hardening patch: it indexes the hardened stack's 3 shipped strategies (convex-5000 + linear supports), 1 routed fill (block 11676051), DAO fee accrual, receipt issuance, and re-exposes executable order bytes; `npm run zubidubi:graph-quote` discovers all 3 and re-quotes the next 0.003 zbETH exit at **7.104497 USDC net** after inventory/exposure repricing. Older Studio versions v0.6.0/v0.6.1 (indexing_error, pre-fix era) are inert; only v0.8.0 serves traffic. Deleting a Studio version label is a dashboard action (Studio -> Deployments -> kebab -> Delete); the CLI has no per-version removal.
 - Added a real-asset Pendle PT mainnet-fork proof. `ZubiDubiPendleMainnetForkTest` uses real `PT-USD3-17DEC2026` as `tokenIn`, real mainnet USDC as `tokenOut`, the PT's real Pendle maturity, and real Chainlink USDC/USD for par-value pricing. This turns the receipt story into a concrete maturing-asset market instead of only a backed Sepolia PT-style receipt.
 - Upgraded the Sepolia `zbETH` demo token into a PT-style backed receipt issuance path: demos now wrap real Sepolia ETH into WETH, deposit WETH into `ZubiDubiExitReceipt.issue()`, mint `zbETH`, and then sell that backed maturing token through Aqua before maturity.
 
 Next build targets:
 
-- Add optional execution mode to the Graph-backed solver so it can submit the routed exit after quoting.
+- ~~Add optional execution mode to the Graph-backed solver so it can submit the routed exit after quoting.~~ **Done** — `ZUBIDUBI_EXECUTE=1 npm run zubidubi:graph-quote` mints backed receipts and atomically executes the Graph-discovered route through `ZubiDubiRouteExecutor` (current hardened-stack proof tx `0x77518aa105405c1986fd2499f414285ac6ba62f2f7fc10542953f74dbdb46da7`, block 11676051).
 - Add a frontend that uses the same Graph solver data for market discovery, route preview, risk panels, fee analytics, and live fill history.
 - Install the Substreams CLI and run the Aqua Liquidity Substreams module against a live The Graph Market or Pinax endpoint for the strongest possible Graph bounty demo.
 - Add a Pendle market benchmark panel to compare ZubiDubi maker quotes against Pendle's live implied PT pricing on the same asset.
@@ -614,9 +618,18 @@ What this fixes:
 What still separates us from the most complete winners:
 
 - No polished frontend yet.
-- No public solver API endpoint yet.
-- No MCP endpoint yet.
-- Substreams module exists and builds to WASM, but has not yet been packaged/run through a live Substreams provider in this repo.
+- No public solver API/MCP endpoint yet; ArcBook-style winners made the indexed order book queryable by both UI and automation.
+- The Sepolia proof uses one maker wallet publishing multiple strategies; tests prove multi-maker routing, but the public demo should show at least 2-3 distinct maker EOAs.
+- The Graph layer has a deployed Subgraph Studio endpoint and a reusable Substreams package, but the Substreams package still needs a live The Graph Market/Pinax run for maximum Graph-bounty strength.
+- Dual-oracle and Pyth adapter support exists in contracts/tests, but the public Sepolia route currently uses the primary Chainlink feed only.
+- Pendle PT real-asset proof exists on mainnet fork; a judge-facing benchmark script should compare ZubiDubi quotes against Pendle market/lens pricing for the same PT.
+
+Current winner-track assessment without frontend:
+
+- Stronger than a basic Aqua app because ZubiDubi now has a real DeFi problem, custom modular SwapVM instructions, onchain Sepolia transfers, DAO revenue, live Graph indexing, a Graph-backed solver, Substreams groundwork, invariant tests, and a real Pendle PT fork proof.
+- Competitive with Ballast-style technical depth because both use real/forked assets, oracle-aware pricing, and custom SwapVM logic; ZubiDubi adds multi-strategy routing, revenue accounting, and receipt lifecycle hardening.
+- Still behind ArcBook/Lotus/RiverSwap as a complete submission surface until the frontend/API layer and distinct public maker demo are added.
+- The highest-leverage next contract/script upgrade is not another curve: it is a public multi-maker deployment script that funds 2-3 maker EOAs, ships different risk curves, executes one route across them, and leaves every event indexed by The Graph.
 
 These are product-surface gaps, not core protocol gaps. The protocol, live deployment, and Graph-backed market reconstruction are now in place.
 
@@ -675,6 +688,14 @@ Start with mock oracle and clean interface. Add real fork oracle later.
 Mitigation:
 
 First custom instruction can combine pricing checks. Split into multiple reusable opcodes after tests pass.
+
+### Risk: free tradability undercuts the "early exit" framing
+
+Mitigation:
+
+Explicit decision (Option B / general case) recorded in the README: `zbETH` is deliberately a freely tradable, delayed-redemption receipt, the same category as a real Pendle PT. Real PTs trade freely at discounted fair value before maturity, so transfer gating is not the product. ZubiDubi's value is pricing the fair early-exit discount (time-to-maturity, oracle backing, exposure, liquidity depth, risk tier) and providing instant, atomically-settled exit liquidity from wallet-held maker funds. Liquidity ≠ redemption
+
+This is consistent with the Pendle mainnet-fork proof, where the real PT is freely tradable by design. Restricting only the demo token would contradict that flagship proof and require whitelisting every Aqua/router/seller transfer path.
 
 ### Risk: router bytecode size
 
@@ -738,24 +759,23 @@ Use `AquaSwapVMRouter`, not full `SwapVMRouter`.
 - Sepolia: deployed Aqua, modular-instruction AquaSwapVMRouter, zbETH receipt token, and route executor with real Sepolia USDC and Chainlink ETH/USD configuration.
 - The Graph: local subgraph added for live Sepolia indexing of Aqua strategies, SwapVM fills, ZubiDubi routes, maker skips, maker exposure, receipt maturity, and protocol/DAO fee accrual.
 
-Note: the local opcode args are now 138 bytes because maker risk policy is encoded directly in the curve. The current Sepolia deployment below uses this upgraded format.
+Note: the local opcode args are now 171 bytes because maker risk policy and the term-structure curve family (linear/convex) are encoded directly in the curve. Legacy 166-byte strategies parse as linear with zero behavior change. The current Sepolia deployment below uses this upgraded format.
 
-Current size check: the production `AquaSwapVMRouter` compiles under the EIP-170 runtime limit at 23,624 bytes, with 952 bytes of margin. The debug router is oversized, but it is not the router intended for deployment.
+Current size check: the production `AquaSwapVMRouter` with the convexity-fixed curve-family library compiles under the EIP-170 runtime limit at 24,337 bytes, with 239 bytes of margin (24,576 limit). The debug router is oversized, but it is not the router intended for deployment.
 
-Current Sepolia deployment:
+Current Sepolia deployment (hardened fixed-convexity curve-family stack, 2026-09-10, block 11676033):
 
-- Aqua: `0x4D70dD3B2594A8AeD0544CE0434A2f93E27931AB`.
-- AquaSwapVMRouter: `0xc8a540840D23398fF44B4a20Cbc612d3b0ED0ECc`.
-- ZubiDubiRouteExecutor: `0xF6AA860E4d48BDEe0e1ec9B794ebB6ce1B0D00d2`.
-- ZubiDubiExitReceipt: `0x8a0D1a9Df2808A35EEa759905baf7BF121BAC4E1`.
-- Deploy Aqua tx: `0xfebad005fcdd19f4e3e6014e588940efb8a72934313e6e03d1988ae89ea2987a`.
-- Deploy AquaSwapVMRouter tx: `0xa95c8c6d3604b992e5affefe001c6508f2f85585ec95628cd6814cc1b9c823a0`.
-- Deploy ZubiDubiExitReceipt tx: `0x2452b740ba60d4ae8649f739303007c0b41f019763737a527879270533a39436`.
-- Deploy ZubiDubiRouteExecutor tx: `0x6336c7f26fac0582ec0ff74355295d7ba07eced6ec51e7f4762ea81dc390d424`.
-- Routed Sepolia demo final sell tx: `0x697047208682ae61d28f910a45aa9f19c58a72c3a34ff34d4ab0c86a072236eb`.
-- Modular demo seller: `0x0829F0E61262153368Bc38D227bc859D9Ab49D6A`.
-- Modular demo result: sold `0.003 zbETH` for `7.244199 USDC` net.
-- Receipt backing proof: `ZubiDubiExitReceipt` held `0.003 WETH` after issuing the sold `zbETH`.
+- Aqua: `0x30aefbDE9EC52A23E597e338F02f35Da909D7183`.
+- AquaSwapVMRouter: `0x3d39B155De93CB9C340577E06b801C4956ed2a57`.
+- ZubiDubiRouteExecutor: `0x95d74BF2a83bc3ba50dc5c377cE8fB1478Ae5708`.
+- ZubiDubiExitReceipt: `0xb7877571932A025E03a7B9616F254B361FD1759F`.
+- Deploy AquaSwapVMRouter tx: `0x240535fd3b5c42087a84aedc0a515ee99f3b02a4b8d211d0809236880dbdd4ba`.
+- Deploy ZubiDubiExitReceipt tx: `0x9453d2362987b4bb39bbdc510f5489079244acbe61d7e68865ee6e8c2874adb5`.
+- Deploy ZubiDubiRouteExecutor tx: `0x32be16feff1d92c133346bf109836a5fc2364a90805e4ef9a12d5541e48b1e71`.
+- Routed fill on the hardened stack:
+  - **convex (50/600, convexity=5000) `0x77518aa105405c1986fd2499f414285ac6ba62f2f7fc10542953f74dbdb46da7` — 0.003 zbETH sold for 7.152727 USDC net**
+- Live quote tape before settlement: convex gross `7,159,886` USDC units vs linear `7,111,608` vs steep linear `6,966,040`; the solver selected the best executable route and paid a 10 bps DAO fee (`7,159` USDC base units).
+- Live Graph-backed re-quote after settlement: next 0.003 zbETH exit quotes at `7.104497 USDC` net after inventory/exposure repricing.
 
 Current mainnet-fork real asset:
 
@@ -792,16 +812,13 @@ Current mainnet-fork real asset:
 - The route can enforce a deterministic max fills limit.
 - If the candidate set cannot fill the requested amount, the whole route reverts.
 
-Live Sepolia routed proof:
+Live Sepolia routed proof (hardened fixed-convexity curve-family stack, block 11676033):
 
-- Route executor: `0xF6AA860E4d48BDEe0e1ec9B794ebB6ce1B0D00d2`.
-- Seller contract: `0x0829F0E61262153368Bc38D227bc859D9Ab49D6A`.
-- Routed swap transaction: `0x697047208682ae61d28f910a45aa9f19c58a72c3a34ff34d4ab0c86a072236eb`.
-- Seller sold `0.003 zbETH`.
-- Seller received `7.244199 USDC`.
-- Maker wallet received the delayed-exit receipt exposure.
-- The sold `zbETH` was issued through `issue()` after depositing `0.003 WETH`, making the Sepolia demo asset a backed maturing claim instead of an unbacked mint.
-- The live Graph-backed solver now discovers the 3 indexed modular strategies from `v0.5.2` and re-quotes the next 0.003 zbETH exit at `7.188748 USDC` net after inventory/exposure repricing.
+- Route executor: `0x95d74BF2a83bc3ba50dc5c377cE8fB1478Ae5708`.
+- Fill 1 (**convex 50/600, convexity=5000**): `0x77518aa105405c1986fd2499f414285ac6ba62f2f7fc10542953f74dbdb46da7` — sold `0.003 zbETH` for `7.152727 USDC` net. The route was selected from convex gross `7.159886 USDC`, linear gross `7.111608 USDC`, and steep linear gross `6.966040 USDC`, then settled atomically through the route executor.
+- Maker wallet received the delayed-exit receipt exposure; route executor transferred the 10 bps DAO fee to the owner fee recipient at every fill.
+- The sold `zbETH` was issued through `issue()` after depositing `0.003 WETH`, so every demo token is a backed maturing claim; the receipt contract tracks real WETH backing.
+- The live Graph-backed solver (`npm run zubidubi:graph-quote`) discovers the 3 indexed strategies from `v0.8.0` and re-quotes the next 0.003 zbETH exit at `7.104497 USDC` net after inventory/exposure repricing; `ZUBIDUBI_EXECUTE=1` executes the route onchain.
 
 ## Final submission story
 
@@ -816,6 +833,10 @@ Delayed-redemption DeFi assets are liquid wrappers around illiquid exits. Liquid
 Solution:
 
 Makers publish self-custodial term-liquidity strategies through Aqua. Takers sell delayed assets for liquid tokens immediately. SwapVM prices each fill from a maturity/risk/exposure curve and Aqua settles atomically from maker wallets.
+
+Design decision (on purpose):
+
+The demo receipt is a freely tradable, delayed-redemption claim — the same general case as a real Pendle PT, which can also be sold elsewhere pre-maturity. We do not gate transfers; we price the fair early-exit discount and provide instant, atomically-settled exit liquidity from wallet-held maker funds. Liquidity ≠ redemption.
 
 Technical contribution:
 

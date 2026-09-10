@@ -42,9 +42,17 @@ contract RunZubiDubiSepoliaRoutedDemo is Script {
         IERC20 usdc = IERC20(config.usdc);
 
         ISwapVM.Order[] memory orders = new ISwapVM.Order[](3);
-        orders[0] = _order(maker, _program(receiptAsset, quoteAsset, 200, 2_400, 500));
-        orders[1] = _order(maker, _program(receiptAsset, quoteAsset, 100, 1_200, 300));
-        orders[2] = _order(maker, _program(receiptAsset, quoteAsset, 50, 600, 300));
+        // Convex curve strategy (family 1, convexityBps=5000): true quadratic premium ≈
+        // 33.8 bps at ~30 days. LOWEST discount of the set → best price for the taker,
+        // so this strategy EXECUTES the convex curve in the real settlement below.
+        // (Live A/B proven in the previous run on this stack: identical linear twin
+        // quoted 7,188,333 vs convex 7,164,179 USDC units ≈ 33.6 bps premium.)
+        orders[0] = _order(maker, _program(receiptAsset, quoteAsset, 50, 600, 300, 1, 5_000));
+        // Linear support: higher discount, never wins against the convex order while
+        // convex capacity remains.
+        orders[1] = _order(maker, _program(receiptAsset, quoteAsset, 100, 1_200, 300, 0, 0));
+        // Linear support, steepest discount: depth fill.
+        orders[2] = _order(maker, _program(receiptAsset, quoteAsset, 200, 2_400, 500, 0, 0));
 
         vm.startBroadcast(deployerPk);
 
@@ -60,12 +68,21 @@ contract RunZubiDubiSepoliaRoutedDemo is Script {
 
         vm.stopBroadcast();
 
-        (uint256 quotedIn, uint256 quotedOut,) = routeExecutor.quoteExactIn(
-            orders,
-            receiptAsset.token,
-            quoteAsset.token,
-            0.003 ether
-        );
+        (uint256 quotedIn, uint256 quotedOut, ZubiDubiRouteExecutor.Quote[] memory quotes) =
+            routeExecutor.quoteExactIn(
+                orders,
+                receiptAsset.token,
+                quoteAsset.token,
+                0.003 ether
+            );
+
+        console2.log("Curve families: strategy[0] convex(5000) | strategy[1] linear(100) | strategy[2] linear(200)");
+        for (uint256 i = 0; i < quotes.length; i++) {
+            console2.log("Quote[", i, "]");
+            console2.logBytes32(quotes[i].orderHash);
+            console2.log("fillIn(zbETH)=", quotes[i].fillIn, "amountOut(USDC)=", quotes[i].amountOut);
+            console2.log("skipped=", quotes[i].skipped ? "yes" : "no");
+        }
 
         uint256 makerUsdcBefore = usdc.balanceOf(maker);
         uint256 sellerUsdcBefore = usdc.balanceOf(address(seller));
@@ -87,9 +104,9 @@ contract RunZubiDubiSepoliaRoutedDemo is Script {
         console2.log("ZubiDubi routed Sepolia seller:", address(seller));
         console2.log("Route executor:", address(routeExecutor));
         console2.log("Quoted receipt in:", quotedIn);
-        console2.log("Quoted USDC out:", quotedOut);
+        console2.log("Quoted USDC out (executor net, 10bps DAO fee included):", quotedOut);
         console2.log("Executed receipt in:", totalIn);
-        console2.log("Executed USDC out:", totalOut);
+        console2.log("Executed USDC out (executor net, 10bps DAO fee included):", totalOut);
         console2.log("Maker USDC before:", makerUsdcBefore);
         console2.log("Maker USDC after:", usdc.balanceOf(maker));
         console2.log("Seller USDC before:", sellerUsdcBefore);
@@ -125,7 +142,9 @@ contract RunZubiDubiSepoliaRoutedDemo is Script {
         ZubiDubiConfig.TokenConfig memory quoteAsset,
         uint32 baseDiscountBps,
         uint32 annualRateBps,
-        uint32 maxDiscountBps
+        uint32 maxDiscountBps,
+        uint8 curveFamily,
+        uint32 convexityBps
     ) private view returns (bytes memory) {
         bytes memory args = AquaExitTermArgsBuilder.build(AquaExitTermArgsBuilder.Args({
                 baseDiscountBps: baseDiscountBps,
@@ -145,7 +164,12 @@ contract RunZubiDubiSepoliaRoutedDemo is Script {
                 minMaturity: 0,
                 maxMaturity: type(uint40).max,
                 allowedTokenIn: receiptAsset.token,
-                allowedTokenOut: quoteAsset.token
+                allowedTokenOut: quoteAsset.token,
+                secondaryOracleAddress: address(0),
+                maxDeviationBps: 0,
+                deviationHaircutBps: 0,
+                curveFamily: curveFamily,
+                convexityBps: convexityBps
         }));
 
         return bytes.concat(

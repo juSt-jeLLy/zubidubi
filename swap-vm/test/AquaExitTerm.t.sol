@@ -199,7 +199,116 @@ contract AquaExitTermTest is AquaSwapVMTest {
 
         assertLt(riskAdjustedOut, vanillaOut);
         assertEq(vanillaOut, 2_940.6 ether);
-        assertEq(riskAdjustedOut, 2_867.1 ether);
+        // riskTierBps is now an ANNUALIZED asset-class haircut. With the same
+        // 30-day maturity the flat 100bps tier becomes ~8bps of duration premium:
+        // 100 * (30/365) = 8bps, plus 500bps liquidity-depth discount on the
+        // 10_000 ether Aqua virtual balance → 2894.4 (vs old flat-add 2867.1).
+        assertEq(riskAdjustedOut, 2_894.4 ether);
+    }
+
+    function test_AquaExitTerm_AnualizedRiskTier_ScalesWithDuration() public {
+        // Same risk tier, two maturities: the haircut must grow with duration.
+        ISwapVM.Order memory shortOrder = _createAquaExitOrder(_buildAquaExitArgsWithRiskTier(
+            100, 1200, 2000, uint40(block.timestamp + 30 days), 1 hours, 100
+        ));
+        ISwapVM.Order memory longOrder = _createAquaExitOrder(_buildAquaExitArgsWithRiskTier(
+            100, 1200, 2000, uint40(block.timestamp + 180 days), 1 hours, 100
+        ));
+        _shipAquaExitOrderFor(maker, shortOrder, 5 ether, 10_000 ether);
+        _shipAquaExitOrderFor(maker, longOrder, 5 ether, 10_000 ether);
+        exitReceipt.mint(address(taker), 2 ether);
+        usdc.mint(maker, 20_000 ether);
+
+        SwapProgram memory swapProgram = _prepareSwap(1 ether, 10_000 ether, true);
+        (, uint256 shortOut) = quote(swapProgram, shortOrder);
+        (, uint256 longOut) = quote(swapProgram, longOrder);
+
+        // Both mature in the future and both carry the same annualized tier,
+        // but the longer-dated receipt must be discounted more steeply.
+        assertLt(longOut, shortOut);
+    }
+
+    function test_AquaExitTerm_ConvexCurve_DiscountSuperlinearInTime() public {
+        // Family 1 (convex) must bend the discount above the linear curve.
+        ISwapVM.Order memory linearOrder = _createAquaExitOrder(_buildAquaExitArgsWithCurve(
+            100, 1200, 2000, uint40(block.timestamp + 365 days), 1 hours, 0, 0
+        ));
+        ISwapVM.Order memory convexOrder = _createAquaExitOrder(_buildAquaExitArgsWithCurve(
+            100, 1200, 2000, uint40(block.timestamp + 365 days), 1 hours, 1, 500
+        ));
+        _shipAquaExitOrderFor(maker, linearOrder, 5 ether, 10_000 ether);
+        _shipAquaExitOrderFor(maker, convexOrder, 5 ether, 10_000 ether);
+        exitReceipt.mint(address(taker), 2 ether);
+        usdc.mint(maker, 20_000 ether);
+
+        SwapProgram memory swapProgram = _prepareSwap(1 ether, 10_000 ether, true);
+        (, uint256 linearOut) = quote(swapProgram, linearOrder);
+        (, uint256 convexOut) = quote(swapProgram, convexOrder);
+
+        // Convex premium at a full year: convexityBps * (365d/365d)^2 = 500bps on top
+        // → base 100 + linear 1200 + convex 500 = 1800bps → 3000 * 0.82 = 2460.
+        assertLt(convexOut, linearOut);
+        // Linear at 365d maturity: base 100bps + (1200bps * 365/365) = 1300bps
+        // → 3000 * 0.87 = 2610.
+        assertEq(linearOut, 2_610 ether);
+        // Convex: quadratic premium = convexityBps * (time/YEAR)^2 = 500 * 1.0 = 500bps.
+        // → 100 + 1200 + 500 = 1800bps → 3000 * 0.82 = 2460.
+        assertEq(convexOut, 2_460 ether);
+    }
+
+    function test_AquaExitTerm_ConvexCurve_ShortDatedSmallConvexityStillQuotesPremium() public {
+        // Regression: the old convex premium (linearDiscount * timeFraction * convexity / 1e8)
+        // truncated to 0 bps for small convexities at short maturities, so a convexity
+        // below ~1216 at 30 days priced IDENTICALLY to linear. The true quadratic
+        // premium (convexityBps * (time/YEAR)^2) must be measurable even at 30 days
+        // with convexityBps = 150 (~1 bps premium), and never zero for convexity > 0.
+        ISwapVM.Order memory linearOrder = _createAquaExitOrder(_buildAquaExitArgsWithCurve(
+            100, 1200, 300, uint40(block.timestamp + 30 days), 1 hours, 0, 0
+        ));
+        ISwapVM.Order memory convexOrder = _createAquaExitOrder(_buildAquaExitArgsWithCurve(
+            100, 1200, 300, uint40(block.timestamp + 30 days), 1 hours, 1, 150
+        ));
+        _shipAquaExitOrderFor(maker, linearOrder, 5 ether, 10_000 ether);
+        _shipAquaExitOrderFor(maker, convexOrder, 5 ether, 10_000 ether);
+        exitReceipt.mint(address(taker), 2 ether);
+        usdc.mint(maker, 20_000 ether);
+
+        SwapProgram memory swapProgram = _prepareSwap(1 ether, 10_000 ether, true);
+        (, uint256 linearOut) = quote(swapProgram, linearOrder);
+        (, uint256 convexOut) = quote(swapProgram, convexOrder);
+
+        // Linear at 30d: base 100 + (1200 * 30/365 = 98) = 198bps → 3000 * 0.9802 = 2940.6.
+        assertEq(linearOut, 2_940_600_000_000_000_000_000);
+        // Convex: + 150 * (30/365)^2 = 1bp → 199bps → 3000 * 0.9801 = 2940.3.
+        assertEq(convexOut, 2_940_300_000_000_000_000_000);
+        // The premium must be non-zero: convex discounts strictly more than linear.
+        assertLt(convexOut, linearOut);
+    }
+
+    function test_AquaExitTerm_LegacyArgs_BehaveAsLinear() public {
+        // Backward-compat: a 166-byte (pre curve-family) args blob must parse
+        // as the linear curve and price identically to the explicit linear form.
+        bytes memory fullArgs = _buildAquaExitArgs(100, 1200, 300, uint40(block.timestamp + 30 days), 1 hours);
+        // Strip the trailing 5-byte curve-family extension to emulate a
+        // strategy shipped before the curve-family upgrade.
+        bytes memory legacyArgs = new bytes(166);
+        for (uint256 i = 0; i < 166; i++) {
+            legacyArgs[i] = fullArgs[i];
+        }
+        ISwapVM.Order memory legacyOrder = _createAquaExitOrder(legacyArgs);
+        ISwapVM.Order memory explicitLinearOrder = _createAquaExitOrder(_buildAquaExitArgsWithCurve(
+            100, 1200, 300, uint40(block.timestamp + 30 days), 1 hours, 0, 0
+        ));
+        _shipAquaExitOrderFor(maker, legacyOrder, 5 ether, 10_000 ether);
+        _shipAquaExitOrderFor(maker, explicitLinearOrder, 5 ether, 10_000 ether);
+        exitReceipt.mint(address(taker), 2 ether);
+        usdc.mint(maker, 20_000 ether);
+
+        SwapProgram memory swapProgram = _prepareSwap(1 ether, 10_000 ether, true);
+        (, uint256 outLegacy) = quote(swapProgram, legacyOrder);
+        (, uint256 outExplicit) = quote(swapProgram, explicitLinearOrder);
+
+        assertEq(outLegacy, outExplicit);
     }
 
     function test_AquaExitTerm_RevertsWhenNotionalExposureExceeded() public {
@@ -474,6 +583,124 @@ contract AquaExitTermTest is AquaSwapVMTest {
         return AquaExitTermArgsBuilder.build(args);
     }
 
+    function _buildAquaExitArgsWithDualOracle(
+        uint32 baseDiscountBps,
+        uint32 annualRateBps,
+        uint32 maxDiscountBps,
+        uint40 maturity,
+        uint32 maxStaleness,
+        address secondaryOracleAddress_,
+        uint8 oracleDecimals_,
+        uint32 maxDeviationBps,
+        uint32 deviationHaircutBps
+    ) internal view returns (bytes memory) {
+        AquaExitTermArgsBuilder.Args memory args = _defaultAquaExitArgs(
+            baseDiscountBps,
+            annualRateBps,
+            maxDiscountBps,
+            maturity,
+            maxStaleness,
+            5 ether,
+            0
+        );
+        args.oracleDecimals = oracleDecimals_;
+        args.secondaryOracleAddress = secondaryOracleAddress_;
+        args.maxDeviationBps = maxDeviationBps;
+        args.deviationHaircutBps = deviationHaircutBps;
+        return AquaExitTermArgsBuilder.build(args);
+    }
+
+    function _buildAquaExitArgsWithCurve(
+        uint32 baseDiscountBps,
+        uint32 annualRateBps,
+        uint32 maxDiscountBps,
+        uint40 maturity,
+        uint32 maxStaleness,
+        uint8 curveFamily,
+        uint32 convexityBps
+    ) internal view returns (bytes memory) {
+        AquaExitTermArgsBuilder.Args memory args = _defaultAquaExitArgs(
+            baseDiscountBps,
+            annualRateBps,
+            maxDiscountBps,
+            maturity,
+            maxStaleness,
+            5 ether,
+            0
+        );
+        args.curveFamily = curveFamily;
+        args.convexityBps = convexityBps;
+        return AquaExitTermArgsBuilder.build(args);
+    }
+
+    function _buildAquaExitArgsWithRiskTier(
+        uint32 baseDiscountBps,
+        uint32 annualRateBps,
+        uint32 maxDiscountBps,
+        uint40 maturity,
+        uint32 maxStaleness,
+        uint32 riskTierBps
+    ) internal view returns (bytes memory) {
+        AquaExitTermArgsBuilder.Args memory args = _defaultAquaExitArgs(
+            baseDiscountBps,
+            annualRateBps,
+            maxDiscountBps,
+            maturity,
+            maxStaleness,
+            5 ether,
+            0
+        );
+        args.riskTierBps = riskTierBps;
+        return AquaExitTermArgsBuilder.build(args);
+    }
+
+    function test_AquaExitTerm_DualOracleDeviationWithinBound_QuotesSameAsSingle() public {
+        MockPriceOracle secondary = new MockPriceOracle(2970e18, 18); // 1% (100bps) below primary 3000e18
+        ISwapVM.Order memory orderDual = _createAquaExitOrder(_buildAquaExitArgsWithDualOracle(100, 1200, 300, uint40(block.timestamp + 30 days), 1 hours, address(secondary), 18, 200, 0));
+        ISwapVM.Order memory orderSingle = _createAquaExitOrder(_buildAquaExitArgs(100, 1200, 300, uint40(block.timestamp + 30 days), 1 hours));
+        _shipAquaExitOrderFor(maker, orderDual, 5 ether, 10_000 ether);
+        _shipAquaExitOrderFor(maker, orderSingle, 5 ether, 10_000 ether);
+
+        SwapProgram memory swapProgram = _prepareSwap(1 ether, 10_000 ether, true);
+        (, uint256 outDual) = quote(swapProgram, orderDual);
+        (, uint256 outSingle) = quote(swapProgram, orderSingle);
+        assertEq(outDual, outSingle);
+    }
+
+    function test_AquaExitTerm_DualOracleDeviationOverBound_Reverts() public {
+        MockPriceOracle secondary = new MockPriceOracle(2800e18, 18); // 200e18 / 3000e18 = 666bps deviation
+        ISwapVM.Order memory order = _createAquaExitOrder(_buildAquaExitArgsWithDualOracle(100, 1200, 300, uint40(block.timestamp + 30 days), 1 hours, address(secondary), 18, 300, 0));
+        _shipAquaExitOrderFor(maker, order, 5 ether, 10_000 ether);
+
+        SwapProgram memory swapProgram = _prepareSwap(1 ether, 10_000 ether, true);
+        vm.expectRevert(abi.encodeWithSelector(AquaExitTerm.AquaExitTermDeviationTooHigh.selector, uint256(666), uint32(300)));
+        _quoteDirect(swapProgram, order);
+    }
+
+    function test_AquaExitTerm_DualOracleDeviationHaircut_WidensDiscount() public {
+        MockPriceOracle secondary = new MockPriceOracle(2970e18, 18); // 100bps deviation
+        // haircut = 200bps, maxDev = 200bps -> extra discount = 100bps
+        ISwapVM.Order memory orderWithHaircut = _createAquaExitOrder(_buildAquaExitArgsWithDualOracle(100, 1200, 300, uint40(block.timestamp + 30 days), 1 hours, address(secondary), 18, 200, 200));
+        ISwapVM.Order memory orderNoHaircut = _createAquaExitOrder(_buildAquaExitArgsWithDualOracle(100, 1200, 300, uint40(block.timestamp + 30 days), 1 hours, address(secondary), 18, 200, 0));
+        _shipAquaExitOrderFor(maker, orderWithHaircut, 5 ether, 10_000 ether);
+        _shipAquaExitOrderFor(maker, orderNoHaircut, 5 ether, 10_000 ether);
+
+        SwapProgram memory swapProgram = _prepareSwap(1 ether, 10_000 ether, true);
+        (, uint256 outNoHaircut) = quote(swapProgram, orderNoHaircut);
+        (, uint256 outHaircut) = quote(swapProgram, orderWithHaircut);
+        assertEq(outNoHaircut, 2_940.6 ether);
+        assertLt(outHaircut, outNoHaircut);
+    }
+
+    function test_AquaExitTerm_DualOracleNoSecondary_BehavesAsSingle() public {
+        ISwapVM.Order memory order = _createAquaExitOrder(_buildAquaExitArgsWithDualOracle(100, 1200, 300, uint40(block.timestamp + 30 days), 1 hours, address(0), 18, 0, 0));
+        _shipAquaExitOrderFor(maker, order, 5 ether, 10_000 ether);
+
+        SwapProgram memory swapProgram = _prepareSwap(1 ether, 10_000 ether, true);
+        (, uint256 amountOut) = quote(swapProgram, order);
+        assertEq(amountOut, 2_940.6 ether);
+    }
+
     function _defaultAquaExitArgs(
         uint32 baseDiscountBps,
         uint32 annualRateBps,
@@ -501,7 +728,12 @@ contract AquaExitTermTest is AquaSwapVMTest {
             minMaturity: 0,
             maxMaturity: type(uint40).max,
             allowedTokenIn: address(exitReceipt),
-            allowedTokenOut: address(usdc)
+            allowedTokenOut: address(usdc),
+            secondaryOracleAddress: address(0),
+            maxDeviationBps: 0,
+            deviationHaircutBps: 0,
+            curveFamily: 0,
+            convexityBps: 0
         });
     }
 

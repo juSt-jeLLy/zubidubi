@@ -360,6 +360,11 @@ export class AquaProgramBuilder extends ProgramBuilder {
       data.maxMaturity,
       data.allowedTokenIn,
       data.allowedTokenOut,
+      data.secondaryOracleAddress,
+      data.maxDeviationBps,
+      data.deviationHaircutBps,
+      data.curveFamily,
+      data.convexityBps,
     )
   }
 }

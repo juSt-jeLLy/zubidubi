@@ -11,8 +11,9 @@ describe('AquaExitTermArgsCoder', () => {
   const oracle = new Address('0x1234567890123456789012345678901234567890')
   const allowedTokenIn = new Address('0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
   const allowedTokenOut = new Address('0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')
+  const secondaryOracle = new Address('0xcccccccccccccccccccccccccccccccccccccccc')
   const encodedArgs =
-    '0x00000064000004b00000012c006774858000000e10121212123456789012345678901234567890123456789000000000000000004563918244f40000000000fa00000000000000008ac7230489e8000000000032000000190000000000ffffffffffaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+    '0x00000064000004b00000012c006774858000000e10121212123456789012345678901234567890123456789000000000000000004563918244f40000000000fa00000000000000008ac7230489e8000000000032000000190000000000ffffffffffaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbcccccccccccccccccccccccccccccccccccccccc00000310000000c80100000320'
 
   it('encodes args exactly like AquaExitTermArgsBuilder.build()', () => {
     const args = new AquaExitTermArgs(
@@ -34,6 +35,11 @@ describe('AquaExitTermArgsCoder', () => {
       (1n << 40n) - 1n,
       allowedTokenIn,
       allowedTokenOut,
+      secondaryOracle,
+      784n,
+      200n,
+      1n,
+      800n,
     )
 
     expect(coder.encode(args).toString()).toBe(encodedArgs)
@@ -62,6 +68,11 @@ describe('AquaExitTermArgsCoder', () => {
     expect(decoded.maxMaturity).toBe((1n << 40n) - 1n)
     expect(decoded.allowedTokenIn.toString()).toBe(allowedTokenIn.toString())
     expect(decoded.allowedTokenOut.toString()).toBe(allowedTokenOut.toString())
+    expect(decoded.secondaryOracleAddress.toString()).toBe(secondaryOracle.toString())
+    expect(decoded.maxDeviationBps).toBe(784n)
+    expect(decoded.deviationHaircutBps).toBe(200n)
+    expect(decoded.curveFamily).toBe(1n)
+    expect(decoded.convexityBps).toBe(800n)
   })
 
   it('builds and decodes the reusable AquaExit instruction-library sequence', () => {
@@ -84,11 +95,16 @@ describe('AquaExitTermArgsCoder', () => {
       (1n << 40n) - 1n,
       allowedTokenIn,
       allowedTokenOut,
+      secondaryOracle,
+      784n,
+      200n,
+      1n,
+      800n,
     )
     const program = new AquaProgramBuilder().aquaExitTermLibrary(args).build()
 
     expect(program.toString()).toBe(
-      `0x248a${encodedArgs.slice(2)}258a${encodedArgs.slice(2)}268a${encodedArgs.slice(2)}`,
+      `0x24ab${encodedArgs.slice(2)}25ab${encodedArgs.slice(2)}26ab${encodedArgs.slice(2)}`,
     )
 
     const decoded = AquaProgramBuilder.decode(program).getInstructions()

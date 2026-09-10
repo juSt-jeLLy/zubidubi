@@ -25,11 +25,9 @@ npx graph auth <DEPLOY_KEY>
 npm run deploy:studio
 ```
 
-Live Studio endpoint:
+Live Studio endpoint (v0.8.0, current):
 
-```text
-https://api.studio.thegraph.com/query/1760034/zubidubi/v0.5.2
-```
+`https://api.studio.thegraph.com/query/1760034/zubidubi/v0.8.0`
 
 Run a live provider query:
 
@@ -45,23 +43,22 @@ npm run zubidubi:graph-quote
 
 That command queries active strategies from this live subgraph, decodes the indexed SwapVM order bytes, and calls the Sepolia `ZubiDubiRouteExecutor.quoteExactIn` function for final deliverability-aware route pricing.
 
-## Live Sepolia Contracts
+## Live Sepolia Contracts (fixed-convexity curve-family stack)
 
-- Aqua: `0x4D70dD3B2594A8AeD0544CE0434A2f93E27931AB`
-- AquaSwapVMRouter: `0xc8a540840D23398fF44B4a20Cbc612d3b0ED0ECc`
-- ZubiDubiRouteExecutor: `0xF6AA860E4d48BDEe0e1ec9B794ebB6ce1B0D00d2`
-- ZubiDubiExitReceipt: `0x8a0D1a9Df2808A35EEa759905baf7BF121BAC4E1`
-- Start block: `11674580`
+- Aqua: `0x30aefbDE9EC52A23E597e338F02f35Da909D7183`
+- AquaSwapVMRouter: `0x3d39B155De93CB9C340577E06b801C4956ed2a57`
+- ZubiDubiRouteExecutor: `0x95d74BF2a83bc3ba50dc5c377cE8fB1478Ae5708`
+- ZubiDubiExitReceipt: `0xb7877571932A025E03a7B9616F254B361FD1759F`
+- Start block: `11676033` (all datasources aligned to the fixed-convexity-stack deployment block)
 
 ## Live Proof Transactions
 
-- Deploy Aqua: `0xfebad005fcdd19f4e3e6014e588940efb8a72934313e6e03d1988ae89ea2987a`
-- Deploy AquaSwapVMRouter: `0xa95c8c6d3604b992e5affefe001c6508f2f85585ec95628cd6814cc1b9c823a0`
-- Deploy ZubiDubiExitReceipt: `0x2452b740ba60d4ae8649f739303007c0b41f019763737a527879270533a39436`
-- Deploy ZubiDubiRouteExecutor: `0x6336c7f26fac0582ec0ff74355295d7ba07eced6ec51e7f4762ea81dc390d424`
-- Routed Sepolia demo final sell transaction: `0x697047208682ae61d28f910a45aa9f19c58a72c3a34ff34d4ab0c86a072236eb`
+- Deploy AquaSwapVMRouter: `0x240535fd3b5c42087a84aedc0a515ee99f3b02a4b8d211d0809236880dbdd4ba`
+- Deploy ZubiDubiExitReceipt: `0x9453d2362987b4bb39bbdc510f5489079244acbe61d7e68865ee6e8c2874adb5`
+- Deploy ZubiDubiRouteExecutor: `0x32be16feff1d92c133346bf109836a5fc2364a90805e4ef9a12d5541e48b1e71`
+- Routed fill (convex curve): `0x77518aa105405c1986fd2499f414285ac6ba62f2f7fc10542953f74dbdb46da7`
 
-The modular routed demo issued `0.003 zbETH` by depositing `0.003 WETH` into the receipt contract, then sold that backed maturing receipt for `7.244199 USDC` net to the seller.
+The v0.8.0 subgraph indexes the hardened fixed-convexity stack: 3 shipped strategies (convex-5000 + linear support programs), 1 routed fill (0.003 zbETH volume, 7.152727 USDC net), 0.007159 USDC DAO fee accrual, and re-exposes the executable order bytes to the Graph-backed solver, which can now also execute routes (`ZUBIDUBI_EXECUTE=1`). Studio versions v0.6.0/v0.6.1 (pre-fix era, indexing_error) are inert; only v0.8.0 serves production queries. Deleting a Studio version label is a dashboard action (Studio → Deployments → kebab menu → Delete); the graph CLI exposes no per-version removal.
 
 ## Where This Improves ZubiDubi
 

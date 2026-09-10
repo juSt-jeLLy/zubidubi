@@ -30,6 +30,11 @@ export class AquaExitTermArgs implements IArgsData {
     public readonly maxMaturity: bigint,
     public readonly allowedTokenIn: Address,
     public readonly allowedTokenOut: Address,
+    public readonly secondaryOracleAddress: Address,
+    public readonly maxDeviationBps: bigint,
+    public readonly deviationHaircutBps: bigint,
+    public readonly curveFamily: bigint,
+    public readonly convexityBps: bigint,
   ) {
     assert(
       baseDiscountBps >= 0n && baseDiscountBps <= UINT_32_MAX,
@@ -99,6 +104,16 @@ export class AquaExitTermArgs implements IArgsData {
       maxMaturity >= 0n && maxMaturity <= UINT_40_MAX,
       `Invalid maxMaturity: ${maxMaturity}. Must be a valid uint40`,
     )
+    assert(maxDeviationBps >= 0n && maxDeviationBps <= UINT_32_MAX, `Invalid maxDeviationBps: ${maxDeviationBps}`)
+    assert(maxDeviationBps <= 10_000n, `Max deviation must be at most 10000 bps`)
+    assert(deviationHaircutBps >= 0n && deviationHaircutBps <= UINT_32_MAX, `Invalid deviationHaircutBps: ${deviationHaircutBps}`)
+    assert(deviationHaircutBps < 10_000n, `Deviation haircut must be less than 10000 bps`)
+    assert(curveFamily >= 0n && curveFamily <= 1n, `Invalid curveFamily: ${curveFamily}. Must be 0 (linear) or 1 (convex)`)
+    assert(
+      convexityBps >= 0n && convexityBps <= UINT_32_MAX,
+      `Invalid convexityBps: ${convexityBps}. Must be a valid uint32`,
+    )
+    assert(convexityBps < 10_000n, `Convexity must be less than 10000 bps`)
   }
 
   static decode(data: HexString): AquaExitTermArgs {
@@ -125,6 +140,11 @@ export class AquaExitTermArgs implements IArgsData {
       maxMaturity: this.maxMaturity.toString(),
       allowedTokenIn: this.allowedTokenIn.toString(),
       allowedTokenOut: this.allowedTokenOut.toString(),
+      secondaryOracleAddress: this.secondaryOracleAddress.toString(),
+      maxDeviationBps: this.maxDeviationBps.toString(),
+      deviationHaircutBps: this.deviationHaircutBps.toString(),
+      curveFamily: this.curveFamily.toString(),
+      convexityBps: this.convexityBps.toString(),
     }
   }
 }

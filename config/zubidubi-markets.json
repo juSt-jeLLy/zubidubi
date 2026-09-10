@@ -3,10 +3,10 @@
     "chainId": 11155111,
     "mode": "public-testnet-demo",
     "baseAsset": {
-      "symbol": "zbETH",
-      "address": "0x8a0D1a9Df2808A35EEa759905baf7BF121BAC4E1",
+      "symbol": "PT-zbETH",
+      "address": "0xb7877571932A025E03a7B9616F254B361FD1759F",
       "decimals": 18,
-      "assetType": "ZubiDubi delayed-redemption receipt",
+      "assetType": "Pendle-style principal token (PT) issued by ZubiDubi",
       "oracle": "0x694AA1769357215DE4FAC081bf1f309aDC325306",
       "oracleDescription": "Chainlink ETH/USD Sepolia"
     },

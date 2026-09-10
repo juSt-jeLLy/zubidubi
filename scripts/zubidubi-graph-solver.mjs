@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createPublicClient, decodeAbiParameters, formatUnits, http, parseAbi, parseUnits } from 'viem'
+import { createPublicClient, createWalletClient, decodeAbiParameters, formatUnits, http, parseAbi, parseUnits } from 'viem'
+import { privateKeyToAccount } from 'viem/accounts'
 import { sepolia } from 'viem/chains'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -12,7 +13,7 @@ const deployment = JSON.parse(readFileSync(join(root, 'swap-vm/deployments/sepol
 
 const endpoint =
   process.env.ZUBIDUBI_SUBGRAPH_ENDPOINT ||
-  'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.5.2'
+  'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.8.0'
 const rpcUrl = process.env.SEPOLIA_RPC_URL || process.env.RPC_URL
 const tokenIn = normalize(process.env.ZUBIDUBI_TOKEN_IN || deployment.exitReceipt)
 const tokenOut = normalize(process.env.ZUBIDUBI_TOKEN_OUT || deployment.usdc)
@@ -107,6 +108,83 @@ console.log(JSON.stringify({
   })),
 }, null, 2))
 
+// ===== Optional submit-execute mode =====
+// ZUBIDUBI_EXECUTE=1 turns the solver into a taker: it mints fresh backed receipts on
+// Sepolia (WETH deposit -> issue), quotes the Graph-discovered route, then atomically
+// executes it through ZubiDubiRouteExecutor. Set ZUBIDUBI_AMOUNT_IN for the size and
+// ZUBIDUBI_RECIPIENT to route USDC proceeds elsewhere (default: operator EOA).
+if (process.env.ZUBIDUBI_EXECUTE === '1') {
+  if (!totalIn || totalIn < amountIn) {
+    throw new Error('Route cannot fill the requested amount; aborting execution.')
+  }
+  await executeRoute({ orders, tokenIn, tokenOut, amountIn, minNetOut: totalOut })
+}
+
+async function executeRoute({ orders, tokenIn, tokenOut, amountIn, minNetOut }) {
+  const privateKey = process.env.SEPOLIA_PRIVATE_KEY || process.env.ZUBIDUBI_PRIVATE_KEY
+  if (!privateKey) throw new Error('Missing SEPOLIA_PRIVATE_KEY (in swap-vm/.env) for execution.')
+
+  const account = privateKeyToAccount(privateKey)
+  const wallet = createWalletClient({ account, chain: sepolia, transport: http(rpcUrl) })
+  const publicClient = createPublicClient({ chain: sepolia, transport: http(rpcUrl) })
+  const recipient = normalize(process.env.ZUBIDUBI_RECIPIENT || account.address)
+
+  const weth = normalize(deployment.weth)
+  const exitReceipt = normalize(deployment.exitReceipt)
+  const executor = normalize(deployment.routeExecutor)
+  const usdc = normalize(deployment.usdc)
+
+  const depositAbi = parseAbi(['function deposit() payable'])
+  const approveAbi = parseAbi(['function approve(address,uint256) returns (bool)'])
+  const issueAbi = parseAbi(['function issue(uint256,address) returns (uint256)'])
+  const routeAbi = parseAbi([
+    'function routeExactIn((address maker,uint256 traits,bytes data)[] orders,address tokenIn,address tokenOut,uint256 amountIn,uint256 minAmountOut,address recipient) returns (uint256 totalIn,uint256 totalOut)',
+  ])
+  const erc20Abi = parseAbi(['function balanceOf(address) view returns (uint256)'])
+  const receiptAbi = parseAbi(['function balanceOf(address) view returns (uint256)'])
+
+  const wait = async (label, hash) => {
+    const receipt = await publicClient.waitForTransactionReceipt({ hash })
+    console.log(`[execute] ${label}: ${receipt.status} ${hash}`)
+    if (receipt.status !== 'success') throw new Error(`Transaction failed: ${label}`)
+    return receipt
+  }
+
+  console.log(`[execute] operator=${account.address} recipient=${recipient} amountIn=${formatUnits(amountIn, 18)} zbETH minNetOut=${formatUnits(minNetOut, 6)} USDC`)
+
+  const deposit = await wallet.writeContract({ address: weth, abi: depositAbi, functionName: 'deposit', value: amountIn })
+  await wait('WETH.deposit', deposit)
+  const approveWeth = await wallet.writeContract({ address: weth, abi: approveAbi, functionName: 'approve', args: [exitReceipt, amountIn] })
+  await wait('WETH.approve(receipt)', approveWeth)
+  const issue = await wallet.writeContract({ address: exitReceipt, abi: issueAbi, functionName: 'issue', args: [amountIn, account.address] })
+  await wait('receipt.issue', issue)
+  const approveReceipt = await wallet.writeContract({ address: exitReceipt, abi: approveAbi, functionName: 'approve', args: [executor, amountIn] })
+  await wait('receipt.approve(executor)', approveReceipt)
+
+  const routeTx = await wallet.writeContract({
+    address: executor,
+    abi: routeAbi,
+    functionName: 'routeExactIn',
+    args: [orders, tokenIn, tokenOut, amountIn, minNetOut, recipient],
+  })
+  await wait('routeExactIn', routeTx)
+
+  const [leftoverReceipts, recipientUsdc] = await Promise.all([
+    publicClient.readContract({ address: exitReceipt, abi: receiptAbi, functionName: 'balanceOf', args: [account.address] }),
+    publicClient.readContract({ address: usdc, abi: erc20Abi, functionName: 'balanceOf', args: [recipient] }),
+  ])
+
+  console.log(JSON.stringify({
+    execution: 'SUCCESS',
+    routeTransaction: routeTx,
+    operator: account.address,
+    recipient,
+    zbETHIn: formatUnits(amountIn, receiptDecimals),
+    minNetOut: formatUnits(minNetOut, quoteTokenDecimals),
+    operatorReceiptLeftover: formatUnits(leftoverReceipts, receiptDecimals),
+    recipientUsdcBalance: formatUnits(recipientUsdc, quoteTokenDecimals),
+  }, null, 2))
+}
 async function graphRequest(url, graphQuery, variables) {
   const res = await fetch(url, {
     method: 'POST',

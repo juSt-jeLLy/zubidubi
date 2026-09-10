@@ -28,6 +28,15 @@ interface IPendleExpiry {
     function expiry() external view returns (uint256);
 }
 
+interface IPendleMarket {
+    /**
+     * @notice Pendle standardized-market implied PT -> asset rate (1e18 base).
+     * @param netPtOut Amount of PT out (0 uses the implied rate without fee adjustment).
+     * @param netSyOut Amount of SY out (0 uses the implied rate without fee adjustment).
+     */
+    function getPtToAssetRate(uint256 netPtOut, uint256 netSyOut) external view returns (uint256);
+}
+
 contract ZubiDubiPendleMainnetForkTest is Test, AquaOpcodesDebug {
     using ProgramBuilder for Program;
 
@@ -164,6 +173,31 @@ contract ZubiDubiPendleMainnetForkTest is Test, AquaOpcodesDebug {
         console2.log("Real Chainlink USDC/USD:", ZubiDubiConfig.MAINNET_CHAINLINK_USDC_USD);
         console2.log("PT sold:", totalIn);
         console2.log("USDC paid after DAO fee:", totalOut);
+
+        // Pendle's own implied PT -> asset rate (1e18 base) vs our routed execution price.
+        // Both token pairs are 6-decimal (PT/USDC), so the executed route rate is
+        // totalOut * 1e18 / totalIn on the same base as Pendle's market-implied rate.
+        (bool pendleOk, uint256 pendleRate) = _readPendlePtToAssetRate();
+        uint256 ourRate = totalOut * 1e18 / totalIn;
+        console2.log("Pendle implied PT -> asset rate (1e18 base):", pendleOk ? pendleRate : 0);
+        console2.log("ZubiDubi routed PT -> USDC rate (1e18 base):", ourRate);
+        if (pendleOk) {
+            uint256 deltaBps = (pendleRate > ourRate ? pendleRate - ourRate : ourRate - pendleRate) / 1e14;
+            console2.log("Delta vs Pendle implied rate (bps):", deltaBps);
+            // Sanity: Pendle's own implied rate and our executed rate should be the
+            // same dollar-normalized ballpark (both are future USD3 claims to ~$1).
+            assertApproxEqRel(pendleRate, ourRate, 0.1e18); // within 10%
+        }
+    }
+
+    function _readPendlePtToAssetRate() internal view returns (bool ok, uint256 rate) {
+        try IPendleMarket(ZubiDubiConfig.MAINNET_PENDLE_USD3_MARKET_17DEC2026).getPtToAssetRate(0, 0)
+            returns (uint256 r)
+        {
+            return (true, r);
+        } catch {
+            return (false, 0);
+        }
     }
 
     function _shipExitOrder(
@@ -232,7 +266,48 @@ contract ZubiDubiPendleMainnetForkTest is Test, AquaOpcodesDebug {
             minMaturity: uint40(block.timestamp + 1 days),
             maxMaturity: type(uint40).max,
             allowedTokenIn: ZubiDubiConfig.MAINNET_PT_USD3_17DEC2026,
-            allowedTokenOut: ZubiDubiConfig.MAINNET_USDC
+            allowedTokenOut: ZubiDubiConfig.MAINNET_USDC,
+            secondaryOracleAddress: address(0),
+            maxDeviationBps: 0,
+            deviationHaircutBps: 0,
+            curveFamily: 0,
+            convexityBps: 0
+        }));
+    }
+
+    function _buildPendlePtExitArgsWithDualOracle(
+        uint32 baseDiscountBps,
+        uint32 annualRateBps,
+        uint32 maxDiscountBps,
+        uint40 maturity,
+        address secondaryOracle,
+        uint32 maxDeviationBps,
+        uint32 deviationHaircutBps
+    ) internal view returns (bytes memory) {
+        return AquaExitTermArgsBuilder.build(AquaExitTermArgsBuilder.Args({
+            baseDiscountBps: baseDiscountBps,
+            annualRateBps: annualRateBps,
+            maxDiscountBps: maxDiscountBps,
+            maturity: maturity,
+            maxStaleness: 2 days,
+            tokenInDecimals: 6,
+            tokenOutDecimals: 6,
+            oracleDecimals: 8,
+            oracleAddress: ZubiDubiConfig.MAINNET_CHAINLINK_USDC_USD,
+            maxExposure: 1_000e6,
+            inventorySlopeBps: 150,
+            maxNotionalOut: 0,
+            liquiditySlopeBps: 25,
+            riskTierBps: 10,
+            minMaturity: uint40(block.timestamp + 1 days),
+            maxMaturity: type(uint40).max,
+            allowedTokenIn: ZubiDubiConfig.MAINNET_PT_USD3_17DEC2026,
+            allowedTokenOut: ZubiDubiConfig.MAINNET_USDC,
+            secondaryOracleAddress: secondaryOracle,
+            maxDeviationBps: maxDeviationBps,
+            deviationHaircutBps: deviationHaircutBps,
+            curveFamily: 0,
+            convexityBps: 0
         }));
     }
 

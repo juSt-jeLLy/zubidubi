@@ -1,11 +1,11 @@
 {
   "name": "zubidubi-subgraph",
-  "version": "0.5.2",
+  "version": "0.8.0",
   "private": true,
   "scripts": {
     "codegen": "graph codegen",
     "build": "graph build",
-    "deploy:studio": "graph deploy ${SUBGRAPH_SLUG:-zubidubi} subgraph.yaml --version-label ${SUBGRAPH_VERSION:-v0.5.2}",
+    "deploy:studio": "graph deploy ${SUBGRAPH_SLUG:-zubidubi} subgraph.yaml --version-label ${SUBGRAPH_VERSION:-v0.8.0}",
     "query:live": "node scripts/query-live.mjs"
   },
   "devDependencies": {

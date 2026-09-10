@@ -29,3 +29,9 @@ via_ir         = true
 [profile.ci.optimizer_details]
 yul = true
 yulDetails = { stackAllocation = true, optimizerSteps = "dhfoDgvulfnTUtnIf[xa[r]EscLMcCTUtTOntnfDIulLculVcul Tpeul]jmul[jul] VcTOcul jmul : fDnTOcmu" }
+
+
+[invariant]
+runs = 256
+depth = 15
+fail_on_revert = false

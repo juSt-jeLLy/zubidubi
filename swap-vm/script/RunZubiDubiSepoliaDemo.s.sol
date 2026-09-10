@@ -135,7 +135,12 @@ contract RunZubiDubiSepoliaDemo is Script {
                 minMaturity: 0,
                 maxMaturity: type(uint40).max,
                 allowedTokenIn: receiptAsset.token,
-                allowedTokenOut: quoteAsset.token
+                allowedTokenOut: quoteAsset.token,
+                secondaryOracleAddress: address(0),
+                maxDeviationBps: 0,
+                deviationHaircutBps: 0,
+                curveFamily: 0,
+                convexityBps: 0
         }));
 
         return bytes.concat(

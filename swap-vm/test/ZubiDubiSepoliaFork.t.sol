@@ -35,7 +35,10 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
     constructor() AquaOpcodesDebug(address(0)) { }
 
     function setUp() public {
-        string memory rpc = vm.envString("SEPOLIA_RPC_URL");
+        string memory rpc = vm.envOr("SEPOLIA_RPC_URL", string(""));
+        if (bytes(rpc).length == 0) {
+            vm.skip(true);
+        }
         vm.createSelectFork(rpc);
         require(block.chainid == SEPOLIA_CHAIN_ID, "Wrong fork");
 
@@ -52,8 +55,8 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
             IERC20(SEPOLIA_WETH),
             uint40(block.timestamp + 30 days),
             1e18,
-            "ZubiDubi ETH Exit Receipt",
-            "zbETH"
+            "ZubiDubi Principal Token (PT) backed by WETH",
+            "PT-zbETH"
         );
         taker = new MockTaker(aqua, swapVM, address(this));
         usdc = IERC20(SEPOLIA_USDC);
@@ -65,12 +68,12 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
 
         ISwapVM.Order memory unavailableOrder = _createExitOrder(
             unavailableMaker,
-            _buildRealSepoliaExitArgs(25, 500, 250, uint40(block.timestamp + 30 days), 2 days),
+            _buildRealSepoliaExitArgs(25, 500, 250, uint40(block.timestamp + 30 days), 2 days, 5 ether, 0),
             bytes32("unavailable-sepolia")
         );
         ISwapVM.Order memory orderA = _createExitOrder(
             makerA,
-            _buildRealSepoliaExitArgs(100, 1200, 300, uint40(block.timestamp + 30 days), 2 days),
+            _buildRealSepoliaExitArgs(100, 1200, 300, uint40(block.timestamp + 30 days), 2 days, 5 ether, 0),
             bytes32("maker-a-sepolia")
         );
 
@@ -126,6 +129,55 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
         uint256 receiptSold = 0.001 ether;
         console2.log("ZubiDubi receipt sold:", receiptSold);
         console2.log("Real USDC units paid:", amountOut);
+    }
+
+    function test_ZubiDubiSepoliaFork_InventoryPricingMovesPriceOnRealOracle() public {
+        address makerA = vm.addr(0xA11CE);
+
+        // Small maxExposure + inventory slope: second fill on the same strategy
+        // must be priced at a worse discount (less USDC out for the same zbETH)
+        // against the real Chainlink ETH/USD feed and real Sepolia USDC.
+        ISwapVM.Order memory orderA = _createExitOrder(
+            makerA,
+            _buildRealSepoliaExitArgs(100, 1200, 500, uint40(block.timestamp + 30 days), 2 days, 0.0008 ether, 150),
+            bytes32("inventory-sepolia")
+        );
+
+        _shipExitOrder(makerA, orderA, 1 ether, 100e6);
+        deal(SEPOLIA_USDC, makerA, 100e6);
+        exitReceipt.mint(address(taker), 0.0005 ether);
+
+        // Fresh-strategy quote for 0.0002 zbETH (inventory ~0).
+        (bool freshCanFill, uint256 freshQuote) = _tryQuoteExactIn(orderA, 0.0002 ether);
+        assertTrue(freshCanFill);
+        assertGt(freshQuote, 0);
+
+        // Execute a 0.0005 zbETH fill so the maker now holds receipt inventory.
+        exitReceipt.mint(address(taker), 0.0005 ether);
+        (, uint256 firstFillOut) = taker.swap(
+            orderA,
+            address(exitReceipt),
+            SEPOLIA_USDC,
+            0.0005 ether,
+            abi.encodePacked(_takerData(address(taker), true))
+        );
+        assertGt(firstFillOut, 0);
+        assertEq(exitReceipt.balanceOf(makerA), 0.0005 ether);
+
+        // Same 0.0002 zbETH quote after inventory: exposure penalty must make it worse.
+        (bool inventoryCanFill, uint256 inventoryQuote) = _tryQuoteExactIn(orderA, 0.0002 ether);
+        assertTrue(inventoryCanFill);
+        assertGt(inventoryQuote, 0);
+        assertLt(inventoryQuote, freshQuote);
+
+        // And a fill that would push exposure past maxExposure must be rejected
+        // on the same real feed (0.0005 held + 0.0004 new > 0.0008 max).
+        (bool overCanFill,) = _tryQuoteExactIn(orderA, 0.0004 ether);
+        assertFalse(overCanFill);
+
+        console2.log("Sepolia fork fresh-strategy quote (0.0002 zbETH):", freshQuote);
+        console2.log("Sepolia fork inventory-priced quote (0.0002 zbETH):", inventoryQuote);
+        console2.log("Sepolia fork exposure-rejected quote (0.0004 zbETH):", overCanFill ? "can fill" : "rejected");
     }
 
     function _tryQuoteExactIn(
@@ -193,7 +245,9 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
         uint32 annualRateBps,
         uint32 maxDiscountBps,
         uint40 maturity,
-        uint32 maxStaleness
+        uint32 maxStaleness,
+        uint128 maxExposure,
+        uint32 inventorySlopeBps
     ) internal pure returns (bytes memory) {
         return AquaExitTermArgsBuilder.build(AquaExitTermArgsBuilder.Args({
             baseDiscountBps: baseDiscountBps,
@@ -205,15 +259,20 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
             tokenOutDecimals: 6,
             oracleDecimals: 8,
             oracleAddress: SEPOLIA_CHAINLINK_ETH_USD,
-            maxExposure: 5 ether,
-            inventorySlopeBps: 0,
+            maxExposure: maxExposure,
+            inventorySlopeBps: inventorySlopeBps,
             maxNotionalOut: 0,
             liquiditySlopeBps: 0,
             riskTierBps: 0,
             minMaturity: 0,
             maxMaturity: type(uint40).max,
             allowedTokenIn: address(0),
-            allowedTokenOut: SEPOLIA_USDC
+            allowedTokenOut: SEPOLIA_USDC,
+            secondaryOracleAddress: address(0),
+            maxDeviationBps: 0,
+            deviationHaircutBps: 0,
+            curveFamily: 0,
+            convexityBps: 0
         }));
     }
 

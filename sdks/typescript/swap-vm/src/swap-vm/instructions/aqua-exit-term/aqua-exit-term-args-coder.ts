@@ -26,6 +26,11 @@ export class AquaExitTermArgsCoder implements IArgsCoder<AquaExitTermArgs> {
     builder.addUint40(args.maxMaturity)
     builder.addAddress(args.allowedTokenIn.toString())
     builder.addAddress(args.allowedTokenOut.toString())
+    builder.addAddress(args.secondaryOracleAddress.toString())
+    builder.addUint32(args.maxDeviationBps)
+    builder.addUint32(args.deviationHaircutBps)
+    builder.addUint8(args.curveFamily)
+    builder.addUint32(args.convexityBps)
 
     return new HexString(builder.asHex())
   }
@@ -50,6 +55,11 @@ export class AquaExitTermArgsCoder implements IArgsCoder<AquaExitTermArgs> {
     const maxMaturity = iter.nextUint40()
     const allowedTokenIn = new Address(iter.nextAddress())
     const allowedTokenOut = new Address(iter.nextAddress())
+    const secondaryOracleAddress = new Address(iter.nextAddress())
+    const maxDeviationBps = iter.nextUint32()
+    const deviationHaircutBps = iter.nextUint32()
+    const curveFamily = iter.nextUint8()
+    const convexityBps = iter.nextUint32()
 
     return new AquaExitTermArgs(
       BigInt(baseDiscountBps),
@@ -70,6 +80,11 @@ export class AquaExitTermArgsCoder implements IArgsCoder<AquaExitTermArgs> {
       BigInt(maxMaturity),
       allowedTokenIn,
       allowedTokenOut,
+      secondaryOracleAddress,
+      BigInt(maxDeviationBps),
+      BigInt(deviationHaircutBps),
+      BigInt(curveFamily),
+      BigInt(convexityBps),
     )
   }
 }
