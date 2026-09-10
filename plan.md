@@ -559,6 +559,25 @@ MVP UI can include:
 - Transaction status.
 - Maker earnings/exposure panel.
 
+## Implementation status
+
+Completed so far:
+
+- Official Aqua and SwapVM sources are vendored locally, with SwapVM based on the production `release/1.0.2` line and the SDK aligned to the official `swap-vm/v0.4.1` release.
+- Custom `AquaExitTerm` SwapVM instruction is implemented for maturity, oracle, exposure, liquidity, risk-tier, max-discount, max-notional, allowed-asset, and staleness checks.
+- Sepolia contracts are deployed for Aqua, modified `AquaSwapVMRouter`, `ZubiDubiExitReceipt`, and `ZubiDubiRouteExecutor`.
+- Routed Sepolia demo executed real token transfers with live Chainlink ETH/USD and Sepolia USDC.
+- `ZubiDubiRouteExecutor` supports multi-maker quote discovery, deliverable balance checks, partial fills, best-price sorting, max-fill limits, atomic execution, maker skip events, and protocol/DAO fee events.
+- The Graph subgraph is deployed on Subgraph Studio and indexes Aqua strategies, SwapVM fills, ZubiDubi routes, maker skips, receipt lifecycle, maker exposure, and DAO/protocol fees.
+- Graph-backed solver app script added at `scripts/zubidubi-graph-solver.mjs`; it queries live indexed strategies, decodes executable SwapVM orders, and uses Sepolia RPC for final `quoteExactIn` freshness checks.
+- Graph-backed solver quote validated against live Sepolia: it found 3 indexed strategies and quoted a 0.003 zbETH exit through `ZubiDubiRouteExecutor` using Graph-discovered order data.
+
+Next build targets:
+
+- Add optional execution mode to the Graph-backed solver so it can submit the routed exit after quoting.
+- Add a frontend that uses the same Graph solver data for market discovery, route preview, risk panels, fee analytics, and live fill history.
+- Add a reusable Aqua Substreams module for standardized shared-liquidity balance deltas if we want the strongest possible Graph bounty angle.
+
 ## Test plan
 
 ### Unit tests

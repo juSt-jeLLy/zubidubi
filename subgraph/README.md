@@ -36,6 +36,14 @@ Run a live provider query:
 npm run query:live
 ```
 
+Run the app-level Graph-backed solver quote from the repo root:
+
+```bash
+npm run zubidubi:graph-quote
+```
+
+That command queries active strategies from this live subgraph, decodes the indexed SwapVM order bytes, and calls the Sepolia `ZubiDubiRouteExecutor.quoteExactIn` function for final deliverability-aware route pricing.
+
 ## Live Sepolia Contracts
 
 - Aqua: `0xd265362BC3F34FBc7f5F7a075899dA9E3E20Da8e`

@@ -2,6 +2,7 @@ query SolverStrategies {
   zubiDubiStrategies(where: { status: ACTIVE }, orderBy: updatedAtTimestamp, orderDirection: desc) {
     id
     orderHash
+    strategyData
     maker { id }
     receiptToken { id symbol decimals }
     quoteToken { id symbol decimals }

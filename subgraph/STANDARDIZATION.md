@@ -34,6 +34,17 @@ Without the subgraph, the solver has to replay Aqua `Shipped`, `Pushed`, `Pulled
 
 With the subgraph, the solver starts from indexed active strategies and only uses RPC for final freshness checks like current wallet balance and allowance.
 
+## App Integration
+
+The root app command `npm run zubidubi:graph-quote` uses this subgraph as the solver's discovery layer:
+
+1. Query live active `ZubiDubiStrategy` entities from Subgraph Studio.
+2. Decode each strategy's indexed `strategyData` back into executable SwapVM `Order` structs.
+3. Pass those orders into `ZubiDubiRouteExecutor.quoteExactIn` on Sepolia.
+4. Return a best-first route preview, candidate maker quotes, skipped makers, and net seller output.
+
+This is the same pattern a frontend and production solver should use: The Graph narrows the market, then contracts perform final freshness checks and atomic settlement.
+
 ## Future Substreams Upgrade
 
 If we want to strengthen the Graph bounty further, the natural next step is a reusable Substreams module for Aqua-style shared-liquidity flows:

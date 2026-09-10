@@ -16,6 +16,7 @@ const query = `{
   zubiDubiStrategies(first: 10, orderBy: updatedAtTimestamp, orderDirection: desc) {
     id
     orderHash
+    strategyData
     status
     maker { id }
     receiptToken { symbol decimals }
