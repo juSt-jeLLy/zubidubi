@@ -117,6 +117,8 @@ export const _allInstructions: Opcode<IArgsData>[] = [
  * Aqua opcodes array - matching the local ZubiDubi AquaSwapVMRouter opcode table.
  */
 export const aquaInstructions: Opcode<IArgsData>[] = [
+  EMPTY_OPCODE, // 0 NOT_INSTRUCTION sentinel
+
   /**
    * Debug slots (1-10) - reserved for debugging
    */
@@ -160,7 +162,10 @@ export const aquaInstructions: Opcode<IArgsData>[] = [
   fee.dynamicProtocolFeeAmountInXD, // 30
   fee.aquaDynamicProtocolFeeAmountInXD, // 31
   peggedSwap.peggedSwapGrowPriceRange2D, // 32
-  extruction.extruction, // 33
+  EMPTY_OPCODE, // 33 pruned from ZubiDubi Aqua router for reusable AquaExit instructions
   controls.onlyTxOriginTokenBalanceNonZero, // 34
-  aquaExitTerm.aquaExitTermSwap1D, // 35
+  aquaExitTerm.aquaExitTermSwap1D, // 35 compatibility wrapper
+  aquaExitTerm.aquaExitBackingOracleCheck, // 36
+  aquaExitTerm.aquaExitExposureCap, // 37
+  aquaExitTerm.aquaExitDiscountCurve1D, // 38
 ] as const

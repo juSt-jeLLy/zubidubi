@@ -31,7 +31,7 @@ export function loadProtocol(event: ethereum.Event): Protocol {
     protocol.slug = 'zubidubi'
     protocol.network = 'sepolia'
     protocol.schemaVersion = '1.0.2-compatible'
-    protocol.subgraphVersion = '0.2.1'
+    protocol.subgraphVersion = '0.3.0'
     protocol.methodologyVersion = '0.1.0'
     protocol.cumulativeStrategyCount = ZERO_BI
     protocol.cumulativeSwapCount = ZERO_BI
@@ -72,7 +72,7 @@ export function loadToken(address: Address): Token {
     token.symbol = symbolFor(address)
     token.name = token.symbol
     token.decimals = decimalsFor(address)
-    token.isReceipt = address.equals(Address.fromString('0x9c99F37e5Ad3F974eeb5a50F929EEa9fa70D3581'))
+    token.isReceipt = address.equals(Address.fromString('0x1585b2f1C396Cd9295e58FC0B51c065Ad5d68c03'))
     token.save()
   }
   return token

@@ -247,30 +247,48 @@ export class AquaProgramBuilder extends ProgramBuilder {
   public aquaExitTermSwap1D(data: DataFor<aquaExitTerm.AquaExitTermArgs>): this {
     super.add(
       aquaExitTerm.aquaExitTermSwap1D.createIx(
-        new aquaExitTerm.AquaExitTermArgs(
-          data.baseDiscountBps,
-          data.annualRateBps,
-          data.maxDiscountBps,
-          data.maturity,
-          data.maxStaleness,
-          data.tokenInDecimals,
-          data.tokenOutDecimals,
-          data.oracleDecimals,
-          data.oracleAddress,
-          data.maxExposure,
-          data.inventorySlopeBps,
-          data.maxNotionalOut,
-          data.liquiditySlopeBps,
-          data.riskTierBps,
-          data.minMaturity,
-          data.maxMaturity,
-          data.allowedTokenIn,
-          data.allowedTokenOut,
-        ),
+        this.buildAquaExitTermArgs(data),
       ),
     )
 
     return this
+  }
+
+  /**
+   * Validates delayed-redemption asset pair, maturity window, and oracle freshness.
+   **/
+  public aquaExitBackingOracleCheck(data: DataFor<aquaExitTerm.AquaExitTermArgs>): this {
+    super.add(aquaExitTerm.aquaExitBackingOracleCheck.createIx(this.buildAquaExitTermArgs(data)))
+
+    return this
+  }
+
+  /**
+   * Enforces maker receipt exposure and optional notional caps.
+   **/
+  public aquaExitExposureCap(data: DataFor<aquaExitTerm.AquaExitTermArgs>): this {
+    super.add(aquaExitTerm.aquaExitExposureCap.createIx(this.buildAquaExitTermArgs(data)))
+
+    return this
+  }
+
+  /**
+   * Prices the exit with the maturity/inventory/depth discount curve.
+   **/
+  public aquaExitDiscountCurve1D(data: DataFor<aquaExitTerm.AquaExitTermArgs>): this {
+    super.add(aquaExitTerm.aquaExitDiscountCurve1D.createIx(this.buildAquaExitTermArgs(data)))
+
+    return this
+  }
+
+  /**
+   * Builds the reusable AquaExit instruction-library sequence.
+   **/
+  public aquaExitTermLibrary(data: DataFor<aquaExitTerm.AquaExitTermArgs>): this {
+    return this
+      .aquaExitBackingOracleCheck(data)
+      .aquaExitExposureCap(data)
+      .aquaExitDiscountCurve1D(data)
   }
 
   /**
@@ -331,5 +349,30 @@ export class AquaProgramBuilder extends ProgramBuilder {
     super.add(debug.printGasLeft.createIx(new debug.PrintGasLeftArgs()))
 
     return this
+  }
+
+  private buildAquaExitTermArgs(
+    data: DataFor<aquaExitTerm.AquaExitTermArgs>,
+  ): aquaExitTerm.AquaExitTermArgs {
+    return new aquaExitTerm.AquaExitTermArgs(
+      data.baseDiscountBps,
+      data.annualRateBps,
+      data.maxDiscountBps,
+      data.maturity,
+      data.maxStaleness,
+      data.tokenInDecimals,
+      data.tokenOutDecimals,
+      data.oracleDecimals,
+      data.oracleAddress,
+      data.maxExposure,
+      data.inventorySlopeBps,
+      data.maxNotionalOut,
+      data.liquiditySlopeBps,
+      data.riskTierBps,
+      data.minMaturity,
+      data.maxMaturity,
+      data.allowedTokenIn,
+      data.allowedTokenOut,
+    )
   }
 }

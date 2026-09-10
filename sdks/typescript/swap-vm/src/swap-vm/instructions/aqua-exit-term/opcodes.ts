@@ -7,3 +7,18 @@ export const aquaExitTermSwap1D: Opcode<AquaExitTermArgs> = new Opcode(
   Symbol('AquaExitTerm.aquaExitTermSwap1D'),
   AquaExitTermArgs.CODER,
 )
+
+export const aquaExitBackingOracleCheck: Opcode<AquaExitTermArgs> = new Opcode(
+  Symbol('AquaExitTerm.aquaExitBackingOracleCheck'),
+  AquaExitTermArgs.CODER,
+)
+
+export const aquaExitExposureCap: Opcode<AquaExitTermArgs> = new Opcode(
+  Symbol('AquaExitTerm.aquaExitExposureCap'),
+  AquaExitTermArgs.CODER,
+)
+
+export const aquaExitDiscountCurve1D: Opcode<AquaExitTermArgs> = new Opcode(
+  Symbol('AquaExitTerm.aquaExitDiscountCurve1D'),
+  AquaExitTermArgs.CODER,
+)

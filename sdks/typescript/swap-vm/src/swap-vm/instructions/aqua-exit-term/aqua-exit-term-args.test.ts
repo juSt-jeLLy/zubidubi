@@ -64,7 +64,7 @@ describe('AquaExitTermArgsCoder', () => {
     expect(decoded.allowedTokenOut.toString()).toBe(allowedTokenOut.toString())
   })
 
-  it('builds and decodes an Aqua program with opcode 34', () => {
+  it('builds and decodes an Aqua program with the compatibility opcode', () => {
     const args = new AquaExitTermArgs(
       100n,
       1200n,
@@ -87,10 +87,46 @@ describe('AquaExitTermArgsCoder', () => {
     )
     const program = new AquaProgramBuilder().aquaExitTermSwap1D(args).build()
 
-    expect(program.toString()).toBe(`0x228a${encodedArgs.slice(2)}`)
+    expect(program.toString()).toBe(`0x238a${encodedArgs.slice(2)}`)
 
     const decoded = AquaProgramBuilder.decode(program).getInstructions()
     expect(decoded).toHaveLength(1)
     expect(decoded[0].args.toJSON()).toEqual(args.toJSON())
+  })
+
+  it('builds and decodes the reusable AquaExit instruction-library sequence', () => {
+    const args = new AquaExitTermArgs(
+      100n,
+      1200n,
+      300n,
+      1735689600n,
+      3600n,
+      18n,
+      18n,
+      18n,
+      oracle,
+      5n * 10n ** 18n,
+      250n,
+      10n * 10n ** 18n,
+      50n,
+      25n,
+      0n,
+      (1n << 40n) - 1n,
+      allowedTokenIn,
+      allowedTokenOut,
+    )
+    const program = new AquaProgramBuilder().aquaExitTermLibrary(args).build()
+
+    expect(program.toString()).toBe(
+      `0x248a${encodedArgs.slice(2)}258a${encodedArgs.slice(2)}268a${encodedArgs.slice(2)}`,
+    )
+
+    const decoded = AquaProgramBuilder.decode(program).getInstructions()
+    expect(decoded).toHaveLength(3)
+    expect(decoded.map((ix) => ix.args.toJSON())).toEqual([
+      args.toJSON(),
+      args.toJSON(),
+      args.toJSON(),
+    ])
   })
 })

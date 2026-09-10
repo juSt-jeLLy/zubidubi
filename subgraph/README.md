@@ -28,7 +28,7 @@ npm run deploy:studio
 Live Studio endpoint:
 
 ```text
-https://api.studio.thegraph.com/query/1760034/zubidubi/v0.2.1
+https://api.studio.thegraph.com/query/1760034/zubidubi/v0.3.0
 ```
 
 Run a live provider query:
@@ -47,21 +47,21 @@ That command queries active strategies from this live subgraph, decodes the inde
 
 ## Live Sepolia Contracts
 
-- Aqua: `0xd265362BC3F34FBc7f5F7a075899dA9E3E20Da8e`
-- AquaSwapVMRouter: `0xd4F7a64301416947D0f62c98B80F588ddEbCb741`
-- ZubiDubiRouteExecutor: `0x2D1d8B08A810766f702ef29A01b6219964073a8d`
-- ZubiDubiExitReceipt: `0x9c99F37e5Ad3F974eeb5a50F929EEa9fa70D3581`
-- Start block: `11671900`
+- Aqua: `0x7E24a4C02F46dD2EF5A98c8865F6cA3Ab87bDFA9`
+- AquaSwapVMRouter: `0xC124B7Db44306C411e51a8273e141b4FD3018662`
+- ZubiDubiRouteExecutor: `0x62c99Fb801C6E3Ded8549bDD2B33abdDe0bAD354`
+- ZubiDubiExitReceipt: `0x1585b2f1C396Cd9295e58FC0B51c065Ad5d68c03`
+- Start block: `11673578`
 
 ## Live Proof Transactions
 
-- Deploy Aqua: `0x0e4490668e79fdc2907ae3e406547526de1fcb738214d20785abd0f8e5e3c708`
-- Deploy AquaSwapVMRouter: `0x7c7ed8716e5a4679b865d45d96c7dbbcf345dbdb0891fe99d8ac3026cbb2fc38`
-- Deploy ZubiDubiExitReceipt: `0x74be4f2c3d266bf63c9cc451b7904cf4f942e79bb01deac0ed1ca45e2ce8cff8`
-- Deploy ZubiDubiRouteExecutor: `0xb3595d3c1c07e9a07c50be84575ecca8f71fe2efa9b4d5d05b97a4b489470bd0`
-- Routed Sepolia demo final sell transaction: `0xca274ac4f8904d06674eca90c681a3d1338766aa3d74a7fa64df67001d85827c`
+- Deploy Aqua: `0xa486e96f8dd58dfbe8554c3dbe8450fd9340d3ccd2289bc28016016f45618503`
+- Deploy AquaSwapVMRouter: `0x96ebe0aa7afbf7b704a0919ebb42520f639d884d87f4d503528f66587fea40bd`
+- Deploy ZubiDubiExitReceipt: `0xfbd1e2efca306f8b52066122684f2a78a417d1d0019fd79f1b7083a29054c3a9`
+- Deploy ZubiDubiRouteExecutor: `0x685e07240027b0fe10fd28bf114f392aea636bc6cd634af087ed2a973c0fb028`
+- Routed Sepolia demo final sell transaction: `0x55d171c389bddbf9d8afeefbed81f9690cece1938c1dd6fae3b3a651be3f5acc`
 
-The routed demo sold `0.003 zbETH` and paid `7.243334 USDC` net to the seller.
+The modular routed demo sold `0.003 zbETH` and paid `7.256317 USDC` net to the seller.
 
 ## Where This Improves ZubiDubi
 

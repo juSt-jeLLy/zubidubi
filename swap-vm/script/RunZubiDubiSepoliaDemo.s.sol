@@ -15,7 +15,9 @@ import { ZubiDubiDemoTaker } from "../src/ZubiDubiDemoTaker.sol";
 import { ZubiDubiConfig } from "./ZubiDubiConfig.sol";
 
 contract RunZubiDubiSepoliaDemo is Script {
-    uint8 private constant OP_AQUA_EXIT_TERM_SWAP_1D = 0x22;
+    uint8 private constant OP_AQUA_EXIT_BACKING_ORACLE_CHECK = 0x24;
+    uint8 private constant OP_AQUA_EXIT_EXPOSURE_CAP = 0x25;
+    uint8 private constant OP_AQUA_EXIT_DISCOUNT_CURVE_1D = 0x26;
     uint256 private constant RECEIPT_CAPACITY = 1 ether;
     uint256 private constant USDC_LIQUIDITY = 100e6;
     uint256 private constant RECEIPT_TO_SELL = 0.001 ether;
@@ -107,9 +109,7 @@ contract RunZubiDubiSepoliaDemo is Script {
         ZubiDubiConfig.TokenConfig memory receiptAsset,
         ZubiDubiConfig.TokenConfig memory quoteAsset
     ) private view returns (bytes memory) {
-        return bytes.concat(
-            abi.encodePacked(OP_AQUA_EXIT_TERM_SWAP_1D, uint8(138)),
-            AquaExitTermArgsBuilder.build(AquaExitTermArgsBuilder.Args({
+        bytes memory args = AquaExitTermArgsBuilder.build(AquaExitTermArgsBuilder.Args({
                 baseDiscountBps: 100,
                 annualRateBps: 1_200,
                 maxDiscountBps: 300,
@@ -128,7 +128,12 @@ contract RunZubiDubiSepoliaDemo is Script {
                 maxMaturity: type(uint40).max,
                 allowedTokenIn: receiptAsset.token,
                 allowedTokenOut: quoteAsset.token
-        }))
+        }));
+
+        return bytes.concat(
+            abi.encodePacked(OP_AQUA_EXIT_BACKING_ORACLE_CHECK, uint8(args.length)), args,
+            abi.encodePacked(OP_AQUA_EXIT_EXPOSURE_CAP, uint8(args.length)), args,
+            abi.encodePacked(OP_AQUA_EXIT_DISCOUNT_CURVE_1D, uint8(args.length)), args
         );
     }
 

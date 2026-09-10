@@ -15,7 +15,9 @@ import { ZubiDubiRouteExecutor } from "../src/ZubiDubiRouteExecutor.sol";
 import { ZubiDubiConfig } from "./ZubiDubiConfig.sol";
 
 contract RunZubiDubiSepoliaRoutedDemo is Script {
-    uint8 private constant OP_AQUA_EXIT_TERM_SWAP_1D = 0x22;
+    uint8 private constant OP_AQUA_EXIT_BACKING_ORACLE_CHECK = 0x24;
+    uint8 private constant OP_AQUA_EXIT_EXPOSURE_CAP = 0x25;
+    uint8 private constant OP_AQUA_EXIT_DISCOUNT_CURVE_1D = 0x26;
 
     function run() external {
         ZubiDubiConfig.NetworkConfig memory config = ZubiDubiConfig.sepolia();
@@ -117,9 +119,7 @@ contract RunZubiDubiSepoliaRoutedDemo is Script {
         uint32 annualRateBps,
         uint32 maxDiscountBps
     ) private view returns (bytes memory) {
-        return bytes.concat(
-            abi.encodePacked(OP_AQUA_EXIT_TERM_SWAP_1D, uint8(138)),
-            AquaExitTermArgsBuilder.build(AquaExitTermArgsBuilder.Args({
+        bytes memory args = AquaExitTermArgsBuilder.build(AquaExitTermArgsBuilder.Args({
                 baseDiscountBps: baseDiscountBps,
                 annualRateBps: annualRateBps,
                 maxDiscountBps: maxDiscountBps,
@@ -138,7 +138,12 @@ contract RunZubiDubiSepoliaRoutedDemo is Script {
                 maxMaturity: type(uint40).max,
                 allowedTokenIn: receiptAsset.token,
                 allowedTokenOut: quoteAsset.token
-        }))
+        }));
+
+        return bytes.concat(
+            abi.encodePacked(OP_AQUA_EXIT_BACKING_ORACLE_CHECK, uint8(args.length)), args,
+            abi.encodePacked(OP_AQUA_EXIT_EXPOSURE_CAP, uint8(args.length)), args,
+            abi.encodePacked(OP_AQUA_EXIT_DISCOUNT_CURVE_1D, uint8(args.length)), args
         );
     }
 

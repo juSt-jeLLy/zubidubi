@@ -146,6 +146,41 @@ contract AquaExitTerm {
     error AquaExitTermMaturityOutOfRange(uint40 maturity, uint40 minMaturity, uint40 maxMaturity);
     error AquaExitTermInsufficientMakerOutputLiquidity(uint256 amountOut, uint256 balanceOut);
 
+    /// @notice Reusable backing/oracle guard for delayed-redemption assets.
+    /// @dev Validates asset pair, maturity window, and oracle freshness. It does not
+    ///      mutate swap registers, so it can be shared across multiple term curves.
+    function _aquaExitBackingOracleCheck(Context memory ctx, bytes calldata args) internal view {
+        AquaExitTermArgsBuilder.Args memory parsed = AquaExitTermArgsBuilder.parse(args);
+
+        _checkAllowedMarket(ctx.query.tokenIn, ctx.query.tokenOut, parsed.allowedTokenIn, parsed.allowedTokenOut);
+        _checkMaturity(parsed.maturity, parsed.minMaturity, parsed.maxMaturity);
+        _oraclePrice1e18(parsed.oracleAddress, parsed.oracleDecimals, parsed.maxStaleness);
+    }
+
+    /// @notice Reusable maker exposure/notional guard.
+    /// @dev Checks receipt inventory limits before pricing. If an earlier instruction
+    ///      has already set amountOut, it also enforces the notional output cap.
+    function _aquaExitExposureCap(Context memory ctx, bytes calldata args) internal pure {
+        AquaExitTermArgsBuilder.Args memory parsed = AquaExitTermArgsBuilder.parse(args);
+
+        uint256 fillAmount = ctx.query.isExactIn ? ctx.swap.amountIn : 0;
+        _checkExposureLimit(ctx.swap.balanceIn, fillAmount, parsed.maxExposure);
+
+        if (ctx.swap.amountOut > 0) {
+            _checkNotionalLimit(ctx.swap.amountOut, ctx.swap.balanceOut, parsed.maxNotionalOut);
+        }
+    }
+
+    /// @notice Reusable maturity/inventory/depth discount curve.
+    /// @dev Computes missing swap amount from oracle backing value, term discount,
+    ///      maker exposure, risk tier, and output-liquidity depth.
+    function _aquaExitDiscountCurve1D(Context memory ctx, bytes calldata args) internal view {
+        AquaExitTermArgsBuilder.Args memory parsed = AquaExitTermArgsBuilder.parse(args);
+
+        uint256 price = _oraclePrice1e18(parsed.oracleAddress, parsed.oracleDecimals, parsed.maxStaleness);
+        _applyDiscountCurve(ctx, parsed, price);
+    }
+
     /// @param args.baseDiscountBps  | 4 bytes
     /// @param args.annualRateBps    | 4 bytes
     /// @param args.maxDiscountBps   | 4 bytes
@@ -171,6 +206,14 @@ contract AquaExitTerm {
         _checkMaturity(parsed.maturity, parsed.minMaturity, parsed.maxMaturity);
         uint256 price = _oraclePrice1e18(parsed.oracleAddress, parsed.oracleDecimals, parsed.maxStaleness);
 
+        _applyDiscountCurve(ctx, parsed, price);
+    }
+
+    function _applyDiscountCurve(
+        Context memory ctx,
+        AquaExitTermArgsBuilder.Args memory parsed,
+        uint256 price
+    ) private view {
         if (ctx.query.isExactIn) {
             require(ctx.swap.amountIn > 0, AquaExitTermRequiresInputAmount());
             uint256 discountBps = _checkedDiscountBps(
@@ -233,8 +276,7 @@ contract AquaExitTerm {
         uint32 riskTierBps,
         uint32 maxDiscountBps
     ) private view returns (uint256 discountBps) {
-        uint256 exposureAfter = currentExposure + fillAmount;
-        require(maxExposure == 0 || exposureAfter <= maxExposure, AquaExitTermExposureLimitExceeded(exposureAfter, maxExposure));
+        uint256 exposureAfter = _checkExposureLimit(currentExposure, fillAmount, maxExposure);
 
         discountBps = _termDiscountBps(baseDiscountBps, annualRateBps, maturity);
         if (maxExposure > 0 && inventorySlopeBps > 0) {
@@ -244,6 +286,15 @@ contract AquaExitTerm {
 
         require(discountBps <= maxDiscountBps, AquaExitTermDiscountTooHigh(discountBps, maxDiscountBps));
         require(discountBps < _BPS, AquaExitTermDiscountExceedsPar(discountBps));
+    }
+
+    function _checkExposureLimit(
+        uint256 currentExposure,
+        uint256 fillAmount,
+        uint128 maxExposure
+    ) private pure returns (uint256 exposureAfter) {
+        exposureAfter = currentExposure + fillAmount;
+        require(maxExposure == 0 || exposureAfter <= maxExposure, AquaExitTermExposureLimitExceeded(exposureAfter, maxExposure));
     }
 
     function _termDiscountBps(

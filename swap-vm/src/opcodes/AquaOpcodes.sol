@@ -13,7 +13,6 @@ import { XYCSwap } from "../instructions/XYCSwap.sol";
 import { XYCConcentrate } from "../instructions/XYCConcentrate.sol";
 import { Decay } from "../instructions/Decay.sol";
 import { Fee } from "../instructions/Fee.sol";
-import { Extruction } from "../instructions/Extruction.sol";
 import { PeggedSwap } from "../instructions/PeggedSwap.sol";
 import { AquaExitTerm } from "../instructions/AquaExitTerm.sol";
 
@@ -24,7 +23,6 @@ contract AquaOpcodes is
     Decay,
     Fee,
     PeggedSwap,
-    Extruction,
     AquaExitTerm
 {
     constructor(address aqua) Fee(aqua) {}
@@ -32,7 +30,7 @@ contract AquaOpcodes is
     function _notInstruction(Context memory /* ctx */, bytes calldata /* args */) internal view {}
 
     function _opcodes() internal pure virtual returns (function(Context memory, bytes calldata) internal[] memory result) {
-        function(Context memory, bytes calldata) internal[37] memory instructions = [
+        function(Context memory, bytes calldata) internal[40] memory instructions = [
             _notInstruction,
             // Debug - reserved for debugging utilities (core infrastructure)
             _notInstruction,
@@ -72,9 +70,16 @@ contract AquaOpcodes is
             Fee._dynamicProtocolFeeAmountInXD,
             Fee._aquaDynamicProtocolFeeAmountInXD,
             PeggedSwap._peggedSwapGrowPriceRange2D,
-            Extruction._extruction,
+            // ZubiDubi prunes external-delegation from the Aqua router because its
+            // reusable native instructions replace the former one-off Extruction path.
+            _notInstruction,
             Controls._onlyTxOriginTokenBalanceNonZero,
+            // ZubiDubi AquaExit compatibility wrapper
             AquaExitTerm._aquaExitTermSwap1D,
+            // ZubiDubi reusable term-liquidity instruction library
+            AquaExitTerm._aquaExitBackingOracleCheck,
+            AquaExitTerm._aquaExitExposureCap,
+            AquaExitTerm._aquaExitDiscountCurve1D,
             _notInstruction
         ];
 
