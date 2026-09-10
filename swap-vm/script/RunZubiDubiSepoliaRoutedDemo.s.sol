@@ -23,6 +23,9 @@ contract RunZubiDubiSepoliaRoutedDemo is Script {
     uint8 private constant OP_AQUA_EXIT_BACKING_ORACLE_CHECK = 0x24;
     uint8 private constant OP_AQUA_EXIT_EXPOSURE_CAP = 0x25;
     uint8 private constant OP_AQUA_EXIT_DISCOUNT_CURVE_1D = 0x26;
+    address private secondaryOracle;
+    uint32 private maxDeviationBps;
+    uint32 private deviationHaircutBps;
 
     function run() external {
         ZubiDubiConfig.NetworkConfig memory config = ZubiDubiConfig.sepolia();
@@ -34,6 +37,13 @@ contract RunZubiDubiSepoliaRoutedDemo is Script {
 
         uint256 deployerPk = vm.envUint("SEPOLIA_PRIVATE_KEY");
         address maker = vm.addr(deployerPk);
+        secondaryOracle = vm.envOr("ZUBIDUBI_SECONDARY_ORACLE", address(0));
+        maxDeviationBps = uint32(vm.envOr("ZUBIDUBI_MAX_DEVIATION_BPS", uint256(0)));
+        deviationHaircutBps = uint32(vm.envOr("ZUBIDUBI_DEVIATION_HAIRCUT_BPS", uint256(0)));
+        require(
+            secondaryOracle == address(0) || maxDeviationBps > 0,
+            "RunZubiDubiSepoliaRoutedDemo: secondary oracle needs max deviation"
+        );
 
         Aqua aqua = Aqua(config.aqua);
         AquaSwapVMRouter router = AquaSwapVMRouter(payable(config.aquaSwapVMRouter));
@@ -103,6 +113,10 @@ contract RunZubiDubiSepoliaRoutedDemo is Script {
 
         console2.log("ZubiDubi routed Sepolia seller:", address(seller));
         console2.log("Route executor:", address(routeExecutor));
+        console2.log("Primary oracle (Chainlink ETH/USD):", receiptAsset.priceFeed);
+        console2.log("Secondary oracle:", secondaryOracle);
+        console2.log("Max deviation bps:", maxDeviationBps);
+        console2.log("Deviation haircut bps:", deviationHaircutBps);
         console2.log("Quoted receipt in:", quotedIn);
         console2.log("Quoted USDC out (executor net, 10bps DAO fee included):", quotedOut);
         console2.log("Executed receipt in:", totalIn);
@@ -165,9 +179,9 @@ contract RunZubiDubiSepoliaRoutedDemo is Script {
                 maxMaturity: type(uint40).max,
                 allowedTokenIn: receiptAsset.token,
                 allowedTokenOut: quoteAsset.token,
-                secondaryOracleAddress: address(0),
-                maxDeviationBps: 0,
-                deviationHaircutBps: 0,
+                secondaryOracleAddress: secondaryOracle,
+                maxDeviationBps: maxDeviationBps,
+                deviationHaircutBps: deviationHaircutBps,
                 curveFamily: curveFamily,
                 convexityBps: convexityBps
         }));

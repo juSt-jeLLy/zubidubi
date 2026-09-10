@@ -1,7 +1,18 @@
 import { Address, BigInt, Bytes, ethereum } from '@graphprotocol/graph-ts'
 import { Account, Market, Protocol, StrategyBalance, StrategySnapshot, Token, ZubiDubiStrategy } from '../generated/schema'
 import { ZubiDubiExitReceipt } from '../generated/ZubiDubiExitReceipt/ZubiDubiExitReceipt'
-import { ONE_BI, PROTOCOL_ID, USDC, ZERO_BI } from './constants'
+import {
+  EXIT_RECEIPT,
+  ONE_BI,
+  PROTOCOL_ID,
+  PT_ZBETH_180D,
+  PT_ZBETH_30D,
+  PT_ZBETH_360D,
+  PT_ZBETH_60D,
+  PT_ZBETH_90D,
+  USDC,
+  ZERO_BI,
+} from './constants'
 
 export function eventId(event: ethereum.Event): string {
   return event.transaction.hash.toHexString() + '-' + event.logIndex.toString()
@@ -72,7 +83,7 @@ export function loadToken(address: Address): Token {
     token.symbol = symbolFor(address)
     token.name = token.symbol
     token.decimals = decimalsFor(address)
-    token.isReceipt = address.equals(Address.fromString('0x8a0d1a9df2808a35eea759905baf7bf121bac4e1'))
+    token.isReceipt = isKnownReceipt(address)
     token.save()
   }
   return token
@@ -180,6 +191,12 @@ export function loadStrategyBalance(strategy: ZubiDubiStrategy, tokenAddress: Ad
 
 export function symbolFor(address: Address): string {
   if (address.equals(USDC)) return 'USDC'
+  if (address.equals(EXIT_RECEIPT)) return 'PT-zbETH'
+  if (address.equals(PT_ZBETH_30D)) return 'PT-zbETH-30D'
+  if (address.equals(PT_ZBETH_60D)) return 'PT-zbETH-60D'
+  if (address.equals(PT_ZBETH_90D)) return 'PT-zbETH-90D'
+  if (address.equals(PT_ZBETH_180D)) return 'PT-zbETH-180D'
+  if (address.equals(PT_ZBETH_360D)) return 'PT-zbETH-360D'
   let receipt = ZubiDubiExitReceipt.bind(address)
   let symbol = receipt.try_symbol()
   if (!symbol.reverted) return symbol.value
@@ -188,8 +205,18 @@ export function symbolFor(address: Address): string {
 
 export function decimalsFor(address: Address): i32 {
   if (address.equals(USDC)) return 6
+  if (isKnownReceipt(address)) return 18
   let receipt = ZubiDubiExitReceipt.bind(address)
   let decimals = receipt.try_decimals()
   if (!decimals.reverted) return decimals.value
   return 18
+}
+
+export function isKnownReceipt(address: Address): boolean {
+  return address.equals(EXIT_RECEIPT) ||
+    address.equals(PT_ZBETH_30D) ||
+    address.equals(PT_ZBETH_60D) ||
+    address.equals(PT_ZBETH_90D) ||
+    address.equals(PT_ZBETH_180D) ||
+    address.equals(PT_ZBETH_360D)
 }

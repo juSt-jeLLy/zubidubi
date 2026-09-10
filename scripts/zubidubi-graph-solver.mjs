@@ -13,7 +13,7 @@ const deployment = JSON.parse(readFileSync(join(root, 'swap-vm/deployments/sepol
 
 const endpoint =
   process.env.ZUBIDUBI_SUBGRAPH_ENDPOINT ||
-  'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.8.0'
+  'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.8.2'
 const rpcUrl = process.env.SEPOLIA_RPC_URL || process.env.RPC_URL
 const tokenIn = normalize(process.env.ZUBIDUBI_TOKEN_IN || deployment.exitReceipt)
 const tokenOut = normalize(process.env.ZUBIDUBI_TOKEN_OUT || deployment.usdc)
@@ -192,7 +192,7 @@ async function graphRequest(url, graphQuery, variables) {
     body: JSON.stringify({ query: graphQuery, variables }),
   })
   const body = await res.json()
-  if (!res.ok || body.errors) {
+  if (!res.ok || body.errors || !body.data) {
     throw new Error(JSON.stringify(body, null, 2))
   }
   return body.data

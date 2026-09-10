@@ -28,13 +28,8 @@ interface IPendleExpiry {
     function expiry() external view returns (uint256);
 }
 
-interface IPendleMarket {
-    /**
-     * @notice Pendle standardized-market implied PT -> asset rate (1e18 base).
-     * @param netPtOut Amount of PT out (0 uses the implied rate without fee adjustment).
-     * @param netSyOut Amount of SY out (0 uses the implied rate without fee adjustment).
-     */
-    function getPtToAssetRate(uint256 netPtOut, uint256 netSyOut) external view returns (uint256);
+interface IPendleRouterStatic {
+    function getPtToAssetRate(address market) external view returns (uint256);
 }
 
 contract ZubiDubiPendleMainnetForkTest is Test, AquaOpcodesDebug {
@@ -174,9 +169,9 @@ contract ZubiDubiPendleMainnetForkTest is Test, AquaOpcodesDebug {
         console2.log("PT sold:", totalIn);
         console2.log("USDC paid after DAO fee:", totalOut);
 
-        // Pendle's own implied PT -> asset rate (1e18 base) vs our routed execution price.
-        // Both token pairs are 6-decimal (PT/USDC), so the executed route rate is
-        // totalOut * 1e18 / totalIn on the same base as Pendle's market-implied rate.
+        // Pendle RouterStatic's own PT -> asset rate (1e18 base) vs our routed
+        // execution price. Both token pairs are 6-decimal (PT/USDC), so the
+        // executed route rate is totalOut * 1e18 / totalIn on the same base.
         (bool pendleOk, uint256 pendleRate) = _readPendlePtToAssetRate();
         uint256 ourRate = totalOut * 1e18 / totalIn;
         console2.log("Pendle implied PT -> asset rate (1e18 base):", pendleOk ? pendleRate : 0);
@@ -191,7 +186,9 @@ contract ZubiDubiPendleMainnetForkTest is Test, AquaOpcodesDebug {
     }
 
     function _readPendlePtToAssetRate() internal view returns (bool ok, uint256 rate) {
-        try IPendleMarket(ZubiDubiConfig.MAINNET_PENDLE_USD3_MARKET_17DEC2026).getPtToAssetRate(0, 0)
+        try IPendleRouterStatic(ZubiDubiConfig.MAINNET_PENDLE_ROUTER_STATIC).getPtToAssetRate(
+            ZubiDubiConfig.MAINNET_PENDLE_USD3_MARKET_17DEC2026
+        )
             returns (uint256 r)
         {
             return (true, r);

@@ -2,7 +2,7 @@ import 'dotenv/config'
 
 const endpoint =
   process.env.ZUBIDUBI_SUBGRAPH_ENDPOINT ||
-  'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.8.0'
+  'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.8.2'
 
 const query = `{
   markets(first: 10, orderBy: cumulativeVolumeOut, orderDirection: desc) {
@@ -66,7 +66,7 @@ const res = await fetch(endpoint, {
 })
 
 const body = await res.json()
-if (!res.ok || body.errors) {
+if (!res.ok || body.errors || !body.data) {
   console.error(JSON.stringify(body, null, 2))
   process.exit(1)
 }

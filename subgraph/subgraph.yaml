@@ -107,3 +107,108 @@ dataSources:
         - event: Transfer(indexed address,indexed address,uint256)
           handler: handleReceiptTransfer
       file: ./src/receipt.ts
+  - kind: ethereum
+    name: ZubiDubiExitReceipt30D
+    network: sepolia
+    source:
+      address: "0x78890Cd804F902E2BBd84A6984130423879BE45b"
+      abi: ZubiDubiExitReceipt
+      startBlock: 11676158
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Token
+        - ReceiptAsset
+      abis:
+        - name: ZubiDubiExitReceipt
+          file: ./abis/ZubiDubiExitReceipt.json
+      eventHandlers:
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleReceiptTransfer
+      file: ./src/receipt.ts
+  - kind: ethereum
+    name: ZubiDubiExitReceipt60D
+    network: sepolia
+    source:
+      address: "0xD49F34d689c79e5a25d674ab684F33873a514d96"
+      abi: ZubiDubiExitReceipt
+      startBlock: 11676159
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Token
+        - ReceiptAsset
+      abis:
+        - name: ZubiDubiExitReceipt
+          file: ./abis/ZubiDubiExitReceipt.json
+      eventHandlers:
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleReceiptTransfer
+      file: ./src/receipt.ts
+  - kind: ethereum
+    name: ZubiDubiExitReceipt90D
+    network: sepolia
+    source:
+      address: "0xa35CBAe88c35b4F06a9992942e889A82388D2Ac8"
+      abi: ZubiDubiExitReceipt
+      startBlock: 11676160
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Token
+        - ReceiptAsset
+      abis:
+        - name: ZubiDubiExitReceipt
+          file: ./abis/ZubiDubiExitReceipt.json
+      eventHandlers:
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleReceiptTransfer
+      file: ./src/receipt.ts
+  - kind: ethereum
+    name: ZubiDubiExitReceipt180D
+    network: sepolia
+    source:
+      address: "0x680Bc9CD0005461A95c75F4A1d3cbADdc7104caB"
+      abi: ZubiDubiExitReceipt
+      startBlock: 11676161
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Token
+        - ReceiptAsset
+      abis:
+        - name: ZubiDubiExitReceipt
+          file: ./abis/ZubiDubiExitReceipt.json
+      eventHandlers:
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleReceiptTransfer
+      file: ./src/receipt.ts
+  - kind: ethereum
+    name: ZubiDubiExitReceipt360D
+    network: sepolia
+    source:
+      address: "0x4f7c1919AABC995f41Ad12cfaE25EBF638E8aDE4"
+      abi: ZubiDubiExitReceipt
+      startBlock: 11676162
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Token
+        - ReceiptAsset
+      abis:
+        - name: ZubiDubiExitReceipt
+          file: ./abis/ZubiDubiExitReceipt.json
+      eventHandlers:
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleReceiptTransfer
+      file: ./src/receipt.ts

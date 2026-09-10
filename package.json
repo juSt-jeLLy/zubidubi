@@ -5,6 +5,8 @@
   "main": "index.js",
   "scripts": {
     "zubidubi:graph-quote": "node scripts/zubidubi-graph-solver.mjs",
+    "zubidubi:pendle-benchmark": "cd swap-vm && forge test --match-test test_ZubiDubiPendleMainnetFork_RoutesRealPtUsd3EarlyExit -vv",
+    "zubidubi:pyth:update-sepolia": "node scripts/update-pyth-sepolia.mjs",
     "zubidubi:substreams:check": "cargo check --manifest-path substreams/aqua-liquidity/Cargo.toml"
   },
   "keywords": [],

@@ -28,9 +28,20 @@ Core guarantees are defended by Foundry invariant suites (`test/invariants/`): m
 - Aqua: `0x30aefbDE9EC52A23E597e338F02f35Da909D7183`
 - AquaSwapVMRouter (curve-family router, EIP-170 24,337 bytes): `0x3d39B155De93CB9C340577E06b801C4956ed2a57`
 - ZubiDubiRouteExecutor (10 bps DAO fee, max 8 fills): `0x95d74BF2a83bc3ba50dc5c377cE8fB1478Ae5708`
-- ZubiDubiExitReceipt (PT-zbETH, backed by WETH): `0xb7877571932A025E03a7B9616F254B361FD1759F`
+- ZubiDubiExitReceipt (original PT-zbETH, backed by WETH): `0xb7877571932A025E03a7B9616F254B361FD1759F`
+- Pyth ETH/USD adapter for dual-oracle routes: `0x6d735402E116BcfC5044B6645e090667e68E2eB8`
 - Subgraph Studio: `https://thegraph.com/studio/subgraph/zubidubi`
-- Subgraph endpoint (v0.8.0, synced to head): `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.8.0`
+- Subgraph endpoint (v0.8.2): `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.8.2`
+
+Public Sepolia maturing asset universe:
+
+| Asset | Address | Maturity | Backing |
+| --- | --- | --- | --- |
+| PT-zbETH-30D | `0x78890Cd804F902E2BBd84A6984130423879BE45b` | 2026-10-10 16:39:36 UTC | WETH, 1:1 |
+| PT-zbETH-60D | `0xD49F34d689c79e5a25d674ab684F33873a514d96` | 2026-11-09 16:39:36 UTC | WETH, 1:1 |
+| PT-zbETH-90D | `0xa35CBAe88c35b4F06a9992942e889A82388D2Ac8` | 2026-12-09 16:39:36 UTC | WETH, 1:1 |
+| PT-zbETH-180D | `0x680Bc9CD0005461A95c75F4A1d3cbADdc7104caB` | 2027-03-09 16:39:36 UTC | WETH, 1:1 |
+| PT-zbETH-360D | `0x4f7c1919AABC995f41Ad12cfaE25EBF638E8aDE4` | 2027-09-05 16:39:36 UTC | WETH, 1:1 |
 
 ## Graph-Backed Solver
 
@@ -131,5 +142,17 @@ MAINNET_RPC_URL=https://eth.drpc.org forge test --match-contract ZubiDubiPendleM
 ```
 
 The fork proof routes an early exit of `220 PT-USD3-17DEC2026` across Aqua makers and settles real ERC20 transfers on forked Ethereum mainnet. Without `MAINNET_RPC_URL`, the test skips cleanly.
+
+Benchmark the ZubiDubi routed PT quote against Pendle RouterStatic's own implied PT-to-asset rate:
+
+```bash
+npm run zubidubi:pendle-benchmark
+```
+
+For live Sepolia dual-oracle routes, update the deployed Pyth ETH/USD price first:
+
+```bash
+npm run zubidubi:pyth:update-sepolia
+```
 
 See `plan.md` for the full product, technical, and bounty-alignment plan.
