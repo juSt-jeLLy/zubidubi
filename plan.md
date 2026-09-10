@@ -225,8 +225,9 @@ Simple MVP formula:
 backingValue = amountIn * oracleBackingPrice
 
 durationDiscount = annualizedDurationRate * secondsToMaturity / 365 days
-exposurePenalty = exposureRate * currentExposure / maxExposure
-totalDiscount = baseSpread + durationDiscount + riskHaircut + exposurePenalty
+exposurePenalty = inventorySlope * exposureAfterFill / maxExposure
+liquidityPenalty = liquiditySlope * quotedOutput / availableMakerLiquidity
+totalDiscount = baseSpread + durationDiscount + riskTierHaircut + exposurePenalty + liquidityPenalty
 
 amountOut = backingValue * (1 - totalDiscount)
 ```
@@ -238,9 +239,10 @@ Example:
 - Base spread is 1%.
 - Duration rate is 12% APR.
 - 30-day duration discount is about 1%.
-- Exposure penalty is 0.5%.
-- Total discount is 2.5%.
-- Taker receives 2925 USDC.
+- Exposure penalty is based on how much receipt exposure the maker already owns.
+- Liquidity penalty grows when the fill consumes more of the maker's available quote liquidity.
+- Total discount is bounded by the maker's max discount.
+- Taker receives the oracle backing value minus all approved risk discounts.
 - Maker receives the claim and expects redemption value around 3000 USDC.
 
 The maker earns the discount for taking duration, liquidity, and redemption risk.
@@ -256,7 +258,10 @@ Possible curve variants:
 - Convex discount for long-dated receipts.
 - Oracle depeg haircut.
 - Queue-depth haircut.
-- Maker inventory skew.
+- Maker inventory/exposure skew.
+- Maker max notional and allowed asset-pair limits.
+- Maker maturity window limits.
+- Maker risk-tier haircut.
 - Volatility-adjusted spread.
 - Minimum and maximum price guardrails.
 - DAO fee extracted from discount spread.
@@ -666,9 +671,22 @@ Use `AquaSwapVMRouter`, not full `SwapVMRouter`.
 - Phase 6: receipt token upgraded into an underlying-backed delayed-redemption receipt with maturity-gated redemption.
 - Phase 7: term curve upgraded with hard max exposure and maker inventory pricing.
 - Phase 8: route executor upgraded with protocol fee revenue and partial-fill recovery through binary search.
+- Phase 9: maker risk policy added to the custom opcode: max notional, allowed asset pair, maturity range, stale oracle protection, liquidity-depth penalty, and risk-tier haircut.
+- Phase 10: route tests added for revoked approvals, moved maker wallet balances, same-maker double counting, max fills, protocol fees, multi-maker splits, multi-asset markets, and Sepolia real Chainlink/USDC execution.
 - Sepolia: deployed Aqua, modified AquaSwapVMRouter, zbETH receipt token, route executor, and live routed demo with real Sepolia USDC and Chainlink ETH/USD.
+- The Graph: local subgraph added for live Sepolia indexing of Aqua strategies, SwapVM fills, ZubiDubi routes, maker skips, maker exposure, receipt maturity, and protocol/DAO fee accrual.
 
-Note: the local opcode args are now 64 bytes because max exposure and inventory slope are encoded in the curve. The already-recorded Sepolia deployment used the earlier curve format, so a fresh Sepolia deployment is needed before running the upgraded live demo.
+Note: the local opcode args are now 138 bytes because maker risk policy is encoded directly in the curve. The current Sepolia deployment below uses this upgraded format.
+
+Current size check: the production `AquaSwapVMRouter` compiles under the EIP-170 runtime limit at 24,407 bytes, with 169 bytes of margin. The debug router is oversized, but it is not the router intended for deployment.
+
+Current Sepolia deployment:
+
+- Aqua: `0xd265362BC3F34FBc7f5F7a075899dA9E3E20Da8e`.
+- AquaSwapVMRouter: `0xd4F7a64301416947D0f62c98B80F588ddEbCb741`.
+- ZubiDubiRouteExecutor: `0x2D1d8B08A810766f702ef29A01b6219964073a8d`.
+- ZubiDubiExitReceipt: `0x9c99F37e5Ad3F974eeb5a50F929EEa9fa70D3581`.
+- Routed Sepolia demo final sell tx: `0xca274ac4f8904d06674eca90c681a3d1338766aa3d74a7fa64df67001d85827c`.
 
 ### Demo Proof
 
@@ -686,10 +704,13 @@ Note: the local opcode args are now 64 bytes because max exposure and inventory 
 - Candidate strategies can arrive unsorted from an offchain solver or The Graph indexer.
 - The executor checks each maker's executable liquidity before selecting fills.
 - Makers with only virtual Aqua balance but no wallet deliverability are skipped.
+- Makers with revoked Aqua allowance are skipped.
+- Makers whose wallet balance moved after publishing are skipped.
 - The route fills best-price strategies first and splits the exit across multiple positions.
 - The route charges protocol revenue from output token proceeds.
 - The route cannot overcount the same maker wallet liquidity across multiple strategies.
 - The route can binary-search down to a maker's largest executable partial fill.
+- The route can enforce a deterministic max fills limit.
 - If the candidate set cannot fill the requested amount, the whole route reverts.
 
 Live Sepolia routed proof:

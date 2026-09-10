@@ -23,6 +23,13 @@ export class AquaExitTermArgs implements IArgsData {
     public readonly oracleAddress: Address,
     public readonly maxExposure: bigint,
     public readonly inventorySlopeBps: bigint,
+    public readonly maxNotionalOut: bigint,
+    public readonly liquiditySlopeBps: bigint,
+    public readonly riskTierBps: bigint,
+    public readonly minMaturity: bigint,
+    public readonly maxMaturity: bigint,
+    public readonly allowedTokenIn: Address,
+    public readonly allowedTokenOut: Address,
   ) {
     assert(
       baseDiscountBps >= 0n && baseDiscountBps <= UINT_32_MAX,
@@ -70,6 +77,28 @@ export class AquaExitTermArgs implements IArgsData {
       `Invalid inventorySlopeBps: ${inventorySlopeBps}. Must be a valid uint32`,
     )
     assert(inventorySlopeBps < 10_000n, `Inventory slope must be less than 10000 bps`)
+    assert(
+      maxNotionalOut >= 0n && maxNotionalOut <= UINT_128_MAX,
+      `Invalid maxNotionalOut: ${maxNotionalOut}. Must be a valid uint128`,
+    )
+    assert(
+      liquiditySlopeBps >= 0n && liquiditySlopeBps <= UINT_32_MAX,
+      `Invalid liquiditySlopeBps: ${liquiditySlopeBps}. Must be a valid uint32`,
+    )
+    assert(liquiditySlopeBps < 10_000n, `Liquidity slope must be less than 10000 bps`)
+    assert(
+      riskTierBps >= 0n && riskTierBps <= UINT_32_MAX,
+      `Invalid riskTierBps: ${riskTierBps}. Must be a valid uint32`,
+    )
+    assert(riskTierBps < 10_000n, `Risk tier must be less than 10000 bps`)
+    assert(
+      minMaturity >= 0n && minMaturity <= UINT_40_MAX,
+      `Invalid minMaturity: ${minMaturity}. Must be a valid uint40`,
+    )
+    assert(
+      maxMaturity >= 0n && maxMaturity <= UINT_40_MAX,
+      `Invalid maxMaturity: ${maxMaturity}. Must be a valid uint40`,
+    )
   }
 
   static decode(data: HexString): AquaExitTermArgs {
@@ -89,6 +118,13 @@ export class AquaExitTermArgs implements IArgsData {
       oracleAddress: this.oracleAddress.toString(),
       maxExposure: this.maxExposure.toString(),
       inventorySlopeBps: this.inventorySlopeBps.toString(),
+      maxNotionalOut: this.maxNotionalOut.toString(),
+      liquiditySlopeBps: this.liquiditySlopeBps.toString(),
+      riskTierBps: this.riskTierBps.toString(),
+      minMaturity: this.minMaturity.toString(),
+      maxMaturity: this.maxMaturity.toString(),
+      allowedTokenIn: this.allowedTokenIn.toString(),
+      allowedTokenOut: this.allowedTokenOut.toString(),
     }
   }
 }

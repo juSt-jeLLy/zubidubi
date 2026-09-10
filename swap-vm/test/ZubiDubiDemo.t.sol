@@ -188,7 +188,7 @@ contract ZubiDubiDemoTest is AquaSwapVMTest {
         uint40 maturity,
         uint32 maxStaleness
     ) internal view returns (bytes memory) {
-        return AquaExitTermArgsBuilder.build({
+        return AquaExitTermArgsBuilder.build(AquaExitTermArgsBuilder.Args({
             baseDiscountBps: baseDiscountBps,
             annualRateBps: annualRateBps,
             maxDiscountBps: maxDiscountBps,
@@ -199,8 +199,15 @@ contract ZubiDubiDemoTest is AquaSwapVMTest {
             oracleDecimals: 18,
             oracleAddress: address(oracle),
             maxExposure: 5 ether,
-            inventorySlopeBps: 0
-        });
+            inventorySlopeBps: 0,
+            maxNotionalOut: 0,
+            liquiditySlopeBps: 0,
+            riskTierBps: 0,
+            minMaturity: 0,
+            maxMaturity: type(uint40).max,
+            allowedTokenIn: address(exitReceipt),
+            allowedTokenOut: address(usdc)
+        }));
     }
 
     function _shipExitOrderFor(

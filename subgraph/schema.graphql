@@ -1,0 +1,145 @@
+type Protocol @entity(immutable: false) {
+  id: ID!
+  name: String!
+  slug: String!
+  network: String!
+  schemaVersion: String!
+  subgraphVersion: String!
+  methodologyVersion: String!
+  cumulativeStrategyCount: BigInt!
+  cumulativeSwapCount: BigInt!
+  cumulativeRouteCount: BigInt!
+  cumulativeUniqueUsers: BigInt!
+  cumulativeVolumeIn: BigInt!
+  cumulativeVolumeOut: BigInt!
+  cumulativeProtocolSideRevenue: BigInt!
+  lastUpdatedBlock: BigInt!
+  lastUpdatedTimestamp: BigInt!
+}
+
+type Account @entity(immutable: false) {
+  id: ID!
+  swapCount: BigInt!
+  routeCount: BigInt!
+  strategyCount: BigInt!
+  firstSeenTimestamp: BigInt!
+  lastSeenTimestamp: BigInt!
+}
+
+type Token @entity(immutable: false) {
+  id: ID!
+  symbol: String!
+  name: String!
+  decimals: Int!
+  isReceipt: Boolean!
+}
+
+type ReceiptAsset @entity(immutable: false) {
+  id: ID!
+  token: Token!
+  underlying: Bytes!
+  maturity: BigInt!
+  assetsPerReceipt: BigInt!
+  totalMinted: BigInt!
+  totalBurned: BigInt!
+  lastUpdatedBlock: BigInt!
+  lastUpdatedTimestamp: BigInt!
+}
+
+type ZubiDubiStrategy @entity(immutable: false) {
+  id: ID!
+  maker: Account!
+  app: Bytes!
+  orderHash: Bytes!
+  strategyData: Bytes!
+  status: StrategyStatus!
+  receiptToken: Token
+  quoteToken: Token
+  receiptVirtualBalance: BigInt!
+  quoteVirtualBalance: BigInt!
+  exposureAmount: BigInt!
+  quotePulledAmount: BigInt!
+  createdAtBlock: BigInt!
+  createdAtTimestamp: BigInt!
+  updatedAtBlock: BigInt!
+  updatedAtTimestamp: BigInt!
+}
+
+type StrategyBalance @entity(immutable: false) {
+  id: ID!
+  strategy: ZubiDubiStrategy!
+  token: Token!
+  virtualBalance: BigInt!
+  pushedAmount: BigInt!
+  pulledAmount: BigInt!
+  updatedAtBlock: BigInt!
+  updatedAtTimestamp: BigInt!
+}
+
+type Swap @entity(immutable: true) {
+  id: ID!
+  orderHash: Bytes!
+  strategy: ZubiDubiStrategy
+  maker: Account!
+  taker: Account!
+  tokenIn: Token!
+  tokenOut: Token!
+  amountIn: BigInt!
+  amountOut: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+  logIndex: BigInt!
+}
+
+type Route @entity(immutable: false) {
+  id: ID!
+  taker: Account!
+  recipient: Account!
+  tokenIn: Token!
+  tokenOut: Token!
+  amountIn: BigInt!
+  netAmountOut: BigInt!
+  fills: BigInt!
+  feeAmount: BigInt!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+  logIndex: BigInt!
+}
+
+type RouteFee @entity(immutable: true) {
+  id: ID!
+  feeRecipient: Account!
+  token: Token!
+  amount: BigInt!
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  logIndex: BigInt!
+}
+
+type MakerSkip @entity(immutable: true) {
+  id: ID!
+  orderHash: Bytes!
+  maker: Account!
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  logIndex: BigInt!
+}
+
+type MakerExposure @entity(immutable: false) {
+  id: ID!
+  maker: Account!
+  receiptToken: Token!
+  amount: BigInt!
+  swapCount: BigInt!
+  lastUpdatedBlock: BigInt!
+  lastUpdatedTimestamp: BigInt!
+}
+
+enum StrategyStatus {
+  ACTIVE
+  DOCKED
+}

@@ -195,7 +195,7 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
         uint40 maturity,
         uint32 maxStaleness
     ) internal pure returns (bytes memory) {
-        return AquaExitTermArgsBuilder.build({
+        return AquaExitTermArgsBuilder.build(AquaExitTermArgsBuilder.Args({
             baseDiscountBps: baseDiscountBps,
             annualRateBps: annualRateBps,
             maxDiscountBps: maxDiscountBps,
@@ -206,8 +206,15 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
             oracleDecimals: 8,
             oracleAddress: SEPOLIA_CHAINLINK_ETH_USD,
             maxExposure: 5 ether,
-            inventorySlopeBps: 0
-        });
+            inventorySlopeBps: 0,
+            maxNotionalOut: 0,
+            liquiditySlopeBps: 0,
+            riskTierBps: 0,
+            minMaturity: 0,
+            maxMaturity: type(uint40).max,
+            allowedTokenIn: address(0),
+            allowedTokenOut: SEPOLIA_USDC
+        }));
     }
 
     function _createExitOrder(

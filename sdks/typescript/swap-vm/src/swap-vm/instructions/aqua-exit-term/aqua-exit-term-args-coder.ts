@@ -19,6 +19,13 @@ export class AquaExitTermArgsCoder implements IArgsCoder<AquaExitTermArgs> {
     builder.addAddress(args.oracleAddress.toString())
     builder.addBytes(uint128Hex(args.maxExposure))
     builder.addUint32(args.inventorySlopeBps)
+    builder.addBytes(uint128Hex(args.maxNotionalOut))
+    builder.addUint32(args.liquiditySlopeBps)
+    builder.addUint32(args.riskTierBps)
+    builder.addUint40(args.minMaturity)
+    builder.addUint40(args.maxMaturity)
+    builder.addAddress(args.allowedTokenIn.toString())
+    builder.addAddress(args.allowedTokenOut.toString())
 
     return new HexString(builder.asHex())
   }
@@ -36,6 +43,13 @@ export class AquaExitTermArgsCoder implements IArgsCoder<AquaExitTermArgs> {
     const oracleAddress = new Address(iter.nextAddress())
     const maxExposure = BigInt(iter.nextBytes(16))
     const inventorySlopeBps = iter.nextUint32()
+    const maxNotionalOut = BigInt(iter.nextBytes(16))
+    const liquiditySlopeBps = iter.nextUint32()
+    const riskTierBps = iter.nextUint32()
+    const minMaturity = iter.nextUint40()
+    const maxMaturity = iter.nextUint40()
+    const allowedTokenIn = new Address(iter.nextAddress())
+    const allowedTokenOut = new Address(iter.nextAddress())
 
     return new AquaExitTermArgs(
       BigInt(baseDiscountBps),
@@ -49,6 +63,13 @@ export class AquaExitTermArgsCoder implements IArgsCoder<AquaExitTermArgs> {
       oracleAddress,
       maxExposure,
       BigInt(inventorySlopeBps),
+      maxNotionalOut,
+      BigInt(liquiditySlopeBps),
+      BigInt(riskTierBps),
+      BigInt(minMaturity),
+      BigInt(maxMaturity),
+      allowedTokenIn,
+      allowedTokenOut,
     )
   }
 }

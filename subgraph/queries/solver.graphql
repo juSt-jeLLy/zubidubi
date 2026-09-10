@@ -1,0 +1,40 @@
+query SolverStrategies {
+  zubiDubiStrategies(where: { status: ACTIVE }, orderBy: updatedAtTimestamp, orderDirection: desc) {
+    id
+    orderHash
+    maker { id }
+    receiptToken { id symbol decimals }
+    quoteToken { id symbol decimals }
+    receiptVirtualBalance
+    quoteVirtualBalance
+    exposureAmount
+    quotePulledAmount
+    updatedAtTimestamp
+  }
+}
+
+query MakerExposure {
+  makerExposures(orderBy: amount, orderDirection: desc) {
+    maker { id }
+    receiptToken { id symbol }
+    amount
+    swapCount
+  }
+}
+
+query ProtocolRevenue {
+  protocol(id: "zubidubi-sepolia") {
+    cumulativeStrategyCount
+    cumulativeSwapCount
+    cumulativeRouteCount
+    cumulativeVolumeIn
+    cumulativeVolumeOut
+    cumulativeProtocolSideRevenue
+  }
+  routeFees(orderBy: timestamp, orderDirection: desc) {
+    feeRecipient { id }
+    token { symbol }
+    amount
+    transactionHash
+  }
+}

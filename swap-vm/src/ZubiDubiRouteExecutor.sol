@@ -33,6 +33,7 @@ contract ZubiDubiRouteExecutor is ITakerCallbacks {
     SwapVM public immutable SWAPVM;
     address public immutable feeRecipient;
     uint16 public immutable feeBps;
+    uint16 public immutable maxFills;
 
     error ZubiDubiRouteExecutorOnlySwapVM();
     error ZubiDubiRouteExecutorNoRecipient();
@@ -58,12 +59,13 @@ contract ZubiDubiRouteExecutor is ITakerCallbacks {
         _;
     }
 
-    constructor(Aqua aqua, SwapVM swapVM, address feeRecipient_, uint16 feeBps_) {
+    constructor(Aqua aqua, SwapVM swapVM, address feeRecipient_, uint16 feeBps_, uint16 maxFills_) {
         if (feeBps_ > 1_000) revert ZubiDubiRouteExecutorFeeTooHigh(feeBps_);
         AQUA = aqua;
         SWAPVM = swapVM;
         feeRecipient = feeRecipient_;
         feeBps = feeBps_;
+        maxFills = maxFills_;
     }
 
     function quoteExactIn(
@@ -168,7 +170,7 @@ contract ZubiDubiRouteExecutor is ITakerCallbacks {
         uint256 remaining = requestedIn;
         uint256 fillCount;
 
-        while (remaining > 0) {
+        while (remaining > 0 && (maxFills == 0 || fillCount < maxFills)) {
             uint256 bestIndex = type(uint256).max;
             Fill memory bestFill;
             Quote memory bestQuote;

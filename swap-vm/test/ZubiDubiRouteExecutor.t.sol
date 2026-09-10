@@ -33,7 +33,7 @@ contract ZubiDubiRouteExecutorTest is AquaSwapVMTest {
         exitReceipt = new TokenMock("ZubiDubi Mock Delayed Exit Receipt", "mxETH");
         usdc = new TokenMock("ZubiDubi Mock USDC", "mUSDC");
         oracle = new MockPriceOracle(3000e18, 18);
-        routeExecutor = new ZubiDubiRouteExecutor(aqua, swapVM, feeRecipient, 10);
+        routeExecutor = new ZubiDubiRouteExecutor(aqua, swapVM, feeRecipient, 10, 0);
     }
 
     function test_ZubiDubiRouteExecutor_SkipsInsolventAndSplitsBestFirst() public {
@@ -208,6 +208,125 @@ contract ZubiDubiRouteExecutorTest is AquaSwapVMTest {
         );
     }
 
+    function test_ZubiDubiRouteExecutor_SkipsMakerWithRevokedApproval() public {
+        address revokedMaker = vm.addr(0xBAD);
+        address goodMaker = vm.addr(0x600D);
+
+        ISwapVM.Order memory revokedOrder = _createExitOrderFor(
+            revokedMaker,
+            _buildAquaExitArgsWithExposure(25, 500, 300, uint40(block.timestamp + 30 days), 1 hours, 1 ether),
+            bytes32("revoked-maker")
+        );
+        ISwapVM.Order memory goodOrder = _createExitOrderFor(
+            goodMaker,
+            _buildAquaExitArgsWithExposure(50, 600, 300, uint40(block.timestamp + 30 days), 1 hours, 1 ether),
+            bytes32("good-maker")
+        );
+
+        _shipExitOrderFor(revokedMaker, revokedOrder, 1 ether, 10_000 ether);
+        _shipExitOrderFor(goodMaker, goodOrder, 1 ether, 10_000 ether);
+        usdc.mint(revokedMaker, 10_000 ether);
+        usdc.mint(goodMaker, 10_000 ether);
+        exitReceipt.mint(seller, 1 ether);
+
+        vm.prank(revokedMaker);
+        usdc.approve(address(aqua), 0);
+
+        ISwapVM.Order[] memory orders = new ISwapVM.Order[](2);
+        orders[0] = revokedOrder;
+        orders[1] = goodOrder;
+
+        (uint256 quotedIn, uint256 quotedOut, ZubiDubiRouteExecutor.Quote[] memory quotes) = routeExecutor.quoteExactIn(
+            orders,
+            address(exitReceipt),
+            address(usdc),
+            1 ether
+        );
+
+        assertEq(quotedIn, 1 ether);
+        assertEq(quotedOut, 2_967.3297 ether);
+        assertTrue(quotes[0].skipped);
+        assertEq(quotes[0].deliverableOut, 0);
+        assertFalse(quotes[1].skipped);
+        assertEq(quotes[1].fillIn, 1 ether);
+    }
+
+    function test_ZubiDubiRouteExecutor_SkipsMakerWhoseWalletBalanceMoved() public {
+        address movedMaker = vm.addr(0xD00D);
+        address goodMaker = vm.addr(0x600D);
+
+        ISwapVM.Order memory movedOrder = _createExitOrderFor(
+            movedMaker,
+            _buildAquaExitArgsWithExposure(25, 500, 300, uint40(block.timestamp + 30 days), 1 hours, 1 ether),
+            bytes32("moved-maker")
+        );
+        ISwapVM.Order memory goodOrder = _createExitOrderFor(
+            goodMaker,
+            _buildAquaExitArgsWithExposure(50, 600, 300, uint40(block.timestamp + 30 days), 1 hours, 1 ether),
+            bytes32("good-maker-2")
+        );
+
+        _shipExitOrderFor(movedMaker, movedOrder, 1 ether, 10_000 ether);
+        _shipExitOrderFor(goodMaker, goodOrder, 1 ether, 10_000 ether);
+        usdc.mint(movedMaker, 10_000 ether);
+        usdc.mint(goodMaker, 10_000 ether);
+        exitReceipt.mint(seller, 1 ether);
+
+        vm.prank(movedMaker);
+        usdc.transfer(vm.addr(0xC011EC7), 10_000 ether);
+
+        ISwapVM.Order[] memory orders = new ISwapVM.Order[](2);
+        orders[0] = movedOrder;
+        orders[1] = goodOrder;
+
+        (uint256 quotedIn,, ZubiDubiRouteExecutor.Quote[] memory quotes) = routeExecutor.quoteExactIn(
+            orders,
+            address(exitReceipt),
+            address(usdc),
+            1 ether
+        );
+
+        assertEq(quotedIn, 1 ether);
+        assertTrue(quotes[0].skipped);
+        assertEq(quotes[0].deliverableOut, 0);
+        assertFalse(quotes[1].skipped);
+    }
+
+    function test_ZubiDubiRouteExecutor_EnforcesMaxFillsLimit() public {
+        ZubiDubiRouteExecutor oneFillExecutor = new ZubiDubiRouteExecutor(aqua, swapVM, feeRecipient, 10, 1);
+        address makerA = vm.addr(0xA11CE);
+        address makerB = vm.addr(0xB0B);
+
+        ISwapVM.Order memory orderA = _createExitOrderFor(
+            makerA,
+            _buildAquaExitArgsWithExposure(50, 600, 300, uint40(block.timestamp + 30 days), 1 hours, 1 ether),
+            bytes32("maker-a-limit")
+        );
+        ISwapVM.Order memory orderB = _createExitOrderFor(
+            makerB,
+            _buildAquaExitArgsWithExposure(100, 1200, 300, uint40(block.timestamp + 30 days), 1 hours, 1 ether),
+            bytes32("maker-b-limit")
+        );
+
+        _shipExitOrderFor(makerA, orderA, 1 ether, 10_000 ether);
+        _shipExitOrderFor(makerB, orderB, 1 ether, 10_000 ether);
+        usdc.mint(makerA, 10_000 ether);
+        usdc.mint(makerB, 10_000 ether);
+
+        ISwapVM.Order[] memory orders = new ISwapVM.Order[](2);
+        orders[0] = orderA;
+        orders[1] = orderB;
+
+        (uint256 quotedIn,,) = oneFillExecutor.quoteExactIn(
+            orders,
+            address(exitReceipt),
+            address(usdc),
+            2 ether
+        );
+
+        assertEq(quotedIn, 1 ether);
+    }
+
     function _buildAquaExitArgs(
         uint32 baseDiscountBps,
         uint32 annualRateBps,
@@ -233,7 +352,7 @@ contract ZubiDubiRouteExecutorTest is AquaSwapVMTest {
         uint32 maxStaleness,
         uint128 maxExposure
     ) internal view returns (bytes memory) {
-        return AquaExitTermArgsBuilder.build({
+        return AquaExitTermArgsBuilder.build(AquaExitTermArgsBuilder.Args({
             baseDiscountBps: baseDiscountBps,
             annualRateBps: annualRateBps,
             maxDiscountBps: maxDiscountBps,
@@ -244,8 +363,15 @@ contract ZubiDubiRouteExecutorTest is AquaSwapVMTest {
             oracleDecimals: 18,
             oracleAddress: address(oracle),
             maxExposure: maxExposure,
-            inventorySlopeBps: 0
-        });
+            inventorySlopeBps: 0,
+            maxNotionalOut: 0,
+            liquiditySlopeBps: 0,
+            riskTierBps: 0,
+            minMaturity: 0,
+            maxMaturity: type(uint40).max,
+            allowedTokenIn: address(exitReceipt),
+            allowedTokenOut: address(usdc)
+        }));
     }
 
     function _shipExitOrderFor(

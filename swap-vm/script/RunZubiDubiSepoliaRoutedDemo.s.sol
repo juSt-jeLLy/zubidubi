@@ -118,8 +118,8 @@ contract RunZubiDubiSepoliaRoutedDemo is Script {
         uint32 maxDiscountBps
     ) private view returns (bytes memory) {
         return bytes.concat(
-            abi.encodePacked(OP_AQUA_EXIT_TERM_SWAP_1D, uint8(64)),
-            AquaExitTermArgsBuilder.build({
+            abi.encodePacked(OP_AQUA_EXIT_TERM_SWAP_1D, uint8(138)),
+            AquaExitTermArgsBuilder.build(AquaExitTermArgsBuilder.Args({
                 baseDiscountBps: baseDiscountBps,
                 annualRateBps: annualRateBps,
                 maxDiscountBps: maxDiscountBps,
@@ -130,8 +130,15 @@ contract RunZubiDubiSepoliaRoutedDemo is Script {
                 oracleDecimals: receiptAsset.priceFeedDecimals,
                 oracleAddress: receiptAsset.priceFeed,
                 maxExposure: 0.01 ether,
-                inventorySlopeBps: 250
-            })
+                inventorySlopeBps: 250,
+                maxNotionalOut: 0,
+                liquiditySlopeBps: 50,
+                riskTierBps: 25,
+                minMaturity: 0,
+                maxMaturity: type(uint40).max,
+                allowedTokenIn: receiptAsset.token,
+                allowedTokenOut: quoteAsset.token
+        }))
         );
     }
 

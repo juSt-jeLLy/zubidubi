@@ -9,8 +9,10 @@ import { AquaExitTermArgsCoder } from './aqua-exit-term-args-coder'
 describe('AquaExitTermArgsCoder', () => {
   const coder = new AquaExitTermArgsCoder()
   const oracle = new Address('0x1234567890123456789012345678901234567890')
+  const allowedTokenIn = new Address('0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+  const allowedTokenOut = new Address('0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')
   const encodedArgs =
-    '0x00000064000004b00000012c006774858000000e10121212123456789012345678901234567890123456789000000000000000004563918244f40000000000fa'
+    '0x00000064000004b00000012c006774858000000e10121212123456789012345678901234567890123456789000000000000000004563918244f40000000000fa00000000000000008ac7230489e8000000000032000000190000000000ffffffffffaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
 
   it('encodes args exactly like AquaExitTermArgsBuilder.build()', () => {
     const args = new AquaExitTermArgs(
@@ -25,6 +27,13 @@ describe('AquaExitTermArgsCoder', () => {
       oracle,
       5n * 10n ** 18n,
       250n,
+      10n * 10n ** 18n,
+      50n,
+      25n,
+      0n,
+      (1n << 40n) - 1n,
+      allowedTokenIn,
+      allowedTokenOut,
     )
 
     expect(coder.encode(args).toString()).toBe(encodedArgs)
@@ -46,6 +55,13 @@ describe('AquaExitTermArgsCoder', () => {
     expect(decoded.oracleAddress.toString()).toBe(oracle.toString())
     expect(decoded.maxExposure).toBe(5n * 10n ** 18n)
     expect(decoded.inventorySlopeBps).toBe(250n)
+    expect(decoded.maxNotionalOut).toBe(10n * 10n ** 18n)
+    expect(decoded.liquiditySlopeBps).toBe(50n)
+    expect(decoded.riskTierBps).toBe(25n)
+    expect(decoded.minMaturity).toBe(0n)
+    expect(decoded.maxMaturity).toBe((1n << 40n) - 1n)
+    expect(decoded.allowedTokenIn.toString()).toBe(allowedTokenIn.toString())
+    expect(decoded.allowedTokenOut.toString()).toBe(allowedTokenOut.toString())
   })
 
   it('builds and decodes an Aqua program with opcode 34', () => {
@@ -61,10 +77,17 @@ describe('AquaExitTermArgsCoder', () => {
       oracle,
       5n * 10n ** 18n,
       250n,
+      10n * 10n ** 18n,
+      50n,
+      25n,
+      0n,
+      (1n << 40n) - 1n,
+      allowedTokenIn,
+      allowedTokenOut,
     )
     const program = new AquaProgramBuilder().aquaExitTermSwap1D(args).build()
 
-    expect(program.toString()).toBe(`0x2240${encodedArgs.slice(2)}`)
+    expect(program.toString()).toBe(`0x228a${encodedArgs.slice(2)}`)
 
     const decoded = AquaProgramBuilder.decode(program).getInstructions()
     expect(decoded).toHaveLength(1)

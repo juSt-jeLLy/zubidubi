@@ -19,6 +19,8 @@ broadcast/
 # SDK/build outputs
 dist/
 .nx/
+subgraph/build/
+subgraph/generated/
 
 # Local secrets
 .env

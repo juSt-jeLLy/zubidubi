@@ -38,7 +38,7 @@ contract DeployZubiDubiSepolia is Script {
             "ZubiDubi ETH Exit Receipt",
             "zbETH"
         );
-        ZubiDubiRouteExecutor routeExecutor = new ZubiDubiRouteExecutor(aqua, router, owner, 10);
+        ZubiDubiRouteExecutor routeExecutor = new ZubiDubiRouteExecutor(aqua, router, owner, 10, 8);
 
         vm.stopBroadcast();
 
@@ -51,16 +51,16 @@ contract DeployZubiDubiSepolia is Script {
         console2.log("Sepolia Chainlink ETH/USD:", config.chainlinkEthUsd);
 
         string memory root = "zubidubi";
-        vm.serializeUint(root, "chainId", block.chainid);
-        vm.serializeAddress(root, "deployer", deployer);
-        vm.serializeAddress(root, "owner", owner);
-        vm.serializeAddress(root, "aqua", address(aqua));
-        vm.serializeAddress(root, "aquaSwapVMRouter", address(router));
-        vm.serializeAddress(root, "routeExecutor", address(routeExecutor));
-        vm.serializeAddress(root, "exitReceipt", address(receipt));
-        vm.serializeAddress(root, "weth", config.weth);
-        vm.serializeAddress(root, "usdc", config.usdc);
-        string memory json = vm.serializeAddress(root, "chainlinkEthUsd", config.chainlinkEthUsd);
+        string memory json = vm.serializeUint(root, "chainId", block.chainid);
+        json = vm.serializeAddress(root, "deployer", deployer);
+        json = vm.serializeAddress(root, "owner", owner);
+        json = vm.serializeAddress(root, "aqua", address(aqua));
+        json = vm.serializeAddress(root, "aquaSwapVMRouter", address(router));
+        json = vm.serializeAddress(root, "routeExecutor", address(routeExecutor));
+        json = vm.serializeAddress(root, "exitReceipt", address(receipt));
+        json = vm.serializeAddress(root, "weth", config.weth);
+        json = vm.serializeAddress(root, "usdc", config.usdc);
+        json = vm.serializeAddress(root, "chainlinkEthUsd", config.chainlinkEthUsd);
 
         vm.writeJson(json, string.concat(vm.projectRoot(), "/deployments/sepolia/ZubiDubi.json"));
     }

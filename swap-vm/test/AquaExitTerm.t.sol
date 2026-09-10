@@ -100,6 +100,27 @@ contract AquaExitTermTest is AquaSwapVMTest {
         assertEq(usdc.balanceOf(maker), makerUsdcLiquidity - 2_940_600_000);
     }
 
+    function test_AquaExitTerm_MultiAssetMarketsUseIndependentOracleAndPolicy() public {
+        exitReceipt = new TokenMock("Mock Delayed LST Receipt", "mzLST");
+        oracle = new MockPriceOracle(2000e18, 18);
+
+        uint256 makerUsdcLiquidity = 10_000 ether;
+        ISwapVM.Order memory order = _createAquaExitOrder(
+            _buildAquaExitArgs(100, 1200, 300, uint40(block.timestamp + 30 days), 1 hours)
+        );
+        _shipAquaExitOrderFor(maker, order, 5 ether, makerUsdcLiquidity);
+
+        SwapProgram memory swapProgram = _prepareSwap(1 ether, makerUsdcLiquidity, true);
+
+        (uint256 amountIn, uint256 amountOut) = swap(swapProgram, order);
+
+        assertEq(amountIn, 1 ether);
+        assertEq(amountOut, 1_960.4 ether);
+        assertEq(exitReceipt.balanceOf(maker), 1 ether);
+        assertEq(usdc.balanceOf(address(taker)), 1_960.4 ether);
+    }
+
+
     function test_AquaExitTerm_LongerMaturityGivesLargerDiscount() public {
         ISwapVM.Order memory shortOrder = _createAquaExitOrder(_buildAquaExitArgs(100, 1200, 2000, uint40(block.timestamp + 30 days), 1 hours));
         ISwapVM.Order memory longOrder = _createAquaExitOrder(_buildAquaExitArgs(100, 1200, 2000, uint40(block.timestamp + 180 days), 1 hours));
@@ -156,6 +177,78 @@ contract AquaExitTermTest is AquaSwapVMTest {
         assertEq(secondOut, 2_790.6 ether);
         assertLt(secondOut, firstOut);
         _assertAquaBalances(maker, orderHash, 2 ether, makerUsdcLiquidity - firstOut - secondOut);
+    }
+
+    function test_AquaExitTerm_RiskTierAndLiquidityDepthIncreaseDiscount() public {
+        ISwapVM.Order memory vanillaOrder = _createAquaExitOrder(_buildAquaExitArgs(100, 1200, 2000, uint40(block.timestamp + 30 days), 1 hours));
+        AquaExitTermArgsBuilder.Args memory riskArgs = _defaultAquaExitArgs(100, 1200, 2000, uint40(block.timestamp + 30 days), 1 hours, 5 ether, 0);
+        riskArgs.maxNotionalOut = 10_000 ether;
+        riskArgs.liquiditySlopeBps = 500;
+        riskArgs.riskTierBps = 100;
+        ISwapVM.Order memory riskAdjustedOrder = _createAquaExitOrder(
+            AquaExitTermArgsBuilder.build(riskArgs)
+        );
+
+        _shipAquaExitOrderFor(maker, vanillaOrder, 5 ether, 10_000 ether);
+        _shipAquaExitOrderFor(maker, riskAdjustedOrder, 5 ether, 10_000 ether);
+        exitReceipt.mint(address(taker), 2 ether);
+        usdc.mint(maker, 20_000 ether);
+
+        uint256 vanillaOut = _swapExactIn(vanillaOrder, 1 ether);
+        uint256 riskAdjustedOut = _swapExactIn(riskAdjustedOrder, 1 ether);
+
+        assertLt(riskAdjustedOut, vanillaOut);
+        assertEq(vanillaOut, 2_940.6 ether);
+        assertEq(riskAdjustedOut, 2_867.1 ether);
+    }
+
+    function test_AquaExitTerm_RevertsWhenNotionalExposureExceeded() public {
+        AquaExitTermArgsBuilder.Args memory args = _defaultAquaExitArgs(100, 1200, 300, uint40(block.timestamp + 30 days), 1 hours, 5 ether, 0);
+        args.maxNotionalOut = 2_000 ether;
+        ISwapVM.Order memory order = _createAquaExitOrder(
+            AquaExitTermArgsBuilder.build(args)
+        );
+        _shipAquaExitOrderFor(maker, order, 5 ether, 10_000 ether);
+        SwapProgram memory swapProgram = _prepareSwap(1 ether, 10_000 ether, true);
+
+        vm.expectRevert(abi.encodeWithSelector(AquaExitTerm.AquaExitTermNotionalLimitExceeded.selector, uint256(2_940.6 ether), uint128(2_000 ether)));
+        _quoteDirect(swapProgram, order);
+    }
+
+    function test_AquaExitTerm_RevertsWhenReceiptAssetNotAllowed() public {
+        TokenMock otherReceipt = new TokenMock("Other Exit Receipt", "oxETH");
+        AquaExitTermArgsBuilder.Args memory args = _defaultAquaExitArgs(100, 1200, 300, uint40(block.timestamp + 30 days), 1 hours, 5 ether, 0);
+        args.maxNotionalOut = 10_000 ether;
+        args.allowedTokenIn = address(otherReceipt);
+        ISwapVM.Order memory order = _createAquaExitOrder(
+            AquaExitTermArgsBuilder.build(args)
+        );
+        _shipAquaExitOrderFor(maker, order, 5 ether, 10_000 ether);
+        SwapProgram memory swapProgram = _prepareSwap(1 ether, 10_000 ether, true);
+
+        vm.expectRevert(abi.encodeWithSelector(
+            AquaExitTerm.AquaExitTermTokenNotAllowed.selector,
+            address(exitReceipt),
+            address(usdc),
+            address(otherReceipt),
+            address(usdc)
+        ));
+        _quoteDirect(swapProgram, order);
+    }
+
+    function test_AquaExitTerm_RevertsWhenMaturityOutsideMakerRange() public {
+        uint40 maturity = uint40(block.timestamp + 30 days);
+        AquaExitTermArgsBuilder.Args memory args = _defaultAquaExitArgs(100, 1200, 300, maturity, 1 hours, 5 ether, 0);
+        args.maxNotionalOut = 10_000 ether;
+        args.minMaturity = uint40(block.timestamp + 60 days);
+        ISwapVM.Order memory order = _createAquaExitOrder(
+            AquaExitTermArgsBuilder.build(args)
+        );
+        _shipAquaExitOrderFor(maker, order, 5 ether, 10_000 ether);
+        SwapProgram memory swapProgram = _prepareSwap(1 ether, 10_000 ether, true);
+
+        vm.expectRevert(abi.encodeWithSelector(AquaExitTerm.AquaExitTermMaturityOutOfRange.selector, maturity, uint40(block.timestamp + 60 days), type(uint40).max));
+        _quoteDirect(swapProgram, order);
     }
 
     function test_AquaExitTerm_RevertsOnStaleOracle() public {
@@ -366,18 +459,49 @@ contract AquaExitTermTest is AquaSwapVMTest {
         uint128 maxExposure,
         uint32 inventorySlopeBps
     ) internal view returns (bytes memory) {
-        return AquaExitTermArgsBuilder.build({
+        AquaExitTermArgsBuilder.Args memory args = _defaultAquaExitArgs(
+            baseDiscountBps,
+            annualRateBps,
+            maxDiscountBps,
+            maturity,
+            maxStaleness,
+            maxExposure,
+            inventorySlopeBps
+        );
+        args.tokenInDecimals = tokenInDecimals;
+        args.tokenOutDecimals = tokenOutDecimals;
+        args.oracleDecimals = oracleDecimals;
+        return AquaExitTermArgsBuilder.build(args);
+    }
+
+    function _defaultAquaExitArgs(
+        uint32 baseDiscountBps,
+        uint32 annualRateBps,
+        uint32 maxDiscountBps,
+        uint40 maturity,
+        uint32 maxStaleness,
+        uint128 maxExposure,
+        uint32 inventorySlopeBps
+    ) internal view returns (AquaExitTermArgsBuilder.Args memory args) {
+        args = AquaExitTermArgsBuilder.Args({
             baseDiscountBps: baseDiscountBps,
             annualRateBps: annualRateBps,
             maxDiscountBps: maxDiscountBps,
             maturity: maturity,
             maxStaleness: maxStaleness,
-            tokenInDecimals: tokenInDecimals,
-            tokenOutDecimals: tokenOutDecimals,
-            oracleDecimals: oracleDecimals,
-            oracleAddress: address(oracle),
             maxExposure: maxExposure,
-            inventorySlopeBps: inventorySlopeBps
+            inventorySlopeBps: inventorySlopeBps,
+            tokenInDecimals: 18,
+            tokenOutDecimals: 18,
+            oracleDecimals: 18,
+            oracleAddress: address(oracle),
+            maxNotionalOut: 0,
+            liquiditySlopeBps: 0,
+            riskTierBps: 0,
+            minMaturity: 0,
+            maxMaturity: type(uint40).max,
+            allowedTokenIn: address(exitReceipt),
+            allowedTokenOut: address(usdc)
         });
     }
 
