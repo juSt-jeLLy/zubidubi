@@ -573,6 +573,8 @@ Completed so far:
 - **Five public Sepolia Aqua strategies shipped** through `RunZubiDubiSepoliaMultiAssetBook`: one USDC exit strategy for each PT-zbETH maturity bucket, with different curve/risk parameters so the indexed market looks like a term-liquidity book, not one hardcoded token.
 - **Subgraph `v0.8.2` deployed and verified for the five-asset book** after `v0.8.1` exposed a hosted indexing error at the first new strategy block. The mapping now treats known Sepolia receipt metadata as deterministic config instead of making historical token-metadata calls for the demo asset universe. Live query health: `_meta.hasIndexingErrors = false`, 8 active strategies, 6 markets, and the five new maturity buckets indexed with 25 USDC virtual quote liquidity each.
 - **Graph-backed solver verified against a new maturity bucket**: `ZUBIDUBI_TOKEN_IN=0x78890Cd804F902E2BBd84A6984130423879BE45b ZUBIDUBI_AMOUNT_IN=0.003 npm run zubidubi:graph-quote` discovers the `PT-zbETH-30D` strategy from Subgraph Studio `v0.8.2` and re-quotes it through Sepolia `ZubiDubiRouteExecutor` at `7.224472 USDC` net.
+- **Solver/product API added**: `npm run zubidubi:solver-api` exposes `GET /health`, `GET /pitch`, `GET /markets`, and `GET|POST /quote`. The API uses The Graph for market discovery and Sepolia `ZubiDubiRouteExecutor.quoteExactIn` for fresh executable route previews, so the future frontend can use the same path as the CLI solver.
+- **Narrative sharpened**: the README now leads with the exact product thesis — ZubiDubi is a self-custodial term-liquidity network for Pendle-like maturing DeFi assets, where makers quote programmable risk curves through Aqua and sellers get instant USDC without locked pools.
 - Foundry invariant suites added: `test/invariants/AquaExitCurveInvariants.t.sol` (discount >= 0 and < par, amountOut monotonic in time, convex >= linear discount over a warped-time tape) and `test/invariants/ZubiDubiRouteInvariants.t.sol` (maker payouts capped at min(wallet, allowance), route atomicity, fee/recipient value conservation, same-maker multi-strategy dedup).
 - Official Aqua and SwapVM sources are vendored locally, with SwapVM based on the production `release/1.0.2` line and the SDK aligned to the official `swap-vm/v0.4.1` release.
 - Custom `AquaExitTerm` SwapVM instruction is implemented for maturity, oracle, exposure, liquidity, risk-tier, max-discount, max-notional, allowed-asset, and staleness checks.
@@ -624,7 +626,7 @@ What this fixes:
 What still separates us from the most complete winners:
 
 - No polished frontend yet.
-- No public solver API/MCP endpoint yet; ArcBook-style winners made the indexed order book queryable by both UI and automation.
+- Public solver API exists locally (`npm run zubidubi:solver-api`) and is ready for the frontend/API deployment step; MCP remains optional polish.
 - The Sepolia proof uses one maker wallet publishing multiple strategies; tests prove multi-maker routing, but the public demo should show at least 2-3 distinct maker EOAs.
 - The Graph layer has a deployed Subgraph Studio endpoint and a reusable Substreams package, but the Substreams package still needs a live The Graph Market/Pinax run for maximum Graph-bounty strength.
 - Dual-oracle and Pyth adapter support exists in contracts/tests and the Sepolia adapter is deployed; executing a public dual-oracle route requires refreshing the Pyth ETH/USD feed through Hermes before calling the route.

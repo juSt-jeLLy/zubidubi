@@ -2,7 +2,9 @@
 
 Self-custodial term liquidity for delayed-redemption DeFi assets on Aqua + SwapVM.
 
-ZubiDubi lets a seller exit a delayed asset such as an LRT withdrawal receipt, PT, vault withdrawal share, or Sepolia `zbETH` receipt into wallet-held maker liquidity. Makers publish Aqua strategies, SwapVM prices each fill with a maturity/oracle/exposure curve, and the ZubiDubi route executor splits the exit across deliverable makers atomically.
+**Pitch:** ZubiDubi is a self-custodial term-liquidity network for Pendle-like maturing DeFi assets, where makers quote programmable risk curves through Aqua and sellers get instant USDC without locked pools.
+
+ZubiDubi lets a seller exit a delayed asset such as an LRT withdrawal receipt, Pendle PT, vault withdrawal share, or Sepolia `zbETH` receipt into wallet-held maker liquidity. Makers publish Aqua strategies, SwapVM prices each fill with a maturity/oracle/exposure curve, The Graph reconstructs the live market book, and the ZubiDubi route executor splits the exit across deliverable makers atomically.
 
 ## Design Decision: free tradability (general case)
 
@@ -58,6 +60,22 @@ The solver flow is:
 5. Optional: `ZUBIDUBI_EXECUTE=1` mints fresh backed receipts and atomically executes the route (see the Submit-Execute section below).
 
 This makes The Graph part of the core app path, not just a dashboard: Graph handles scalable market discovery, while Sepolia contracts handle final balance, allowance, quote, and settlement checks.
+
+## Solver API
+
+```bash
+npm run zubidubi:solver-api
+```
+
+The API exposes the solver as a product surface for the frontend and demo automation:
+
+- `GET /health` checks the service.
+- `GET /pitch` returns the judge-facing product thesis.
+- `GET /markets` returns the live Graph-indexed term book, recent fills, and protocol totals.
+- `GET /quote?tokenIn=0x78890Cd804F902E2BBd84A6984130423879BE45b&amountIn=0.003` returns a route preview for a specific maturing asset.
+- `POST /quote` accepts `{ "tokenIn": "0x...", "amountIn": "0.003" }`.
+
+The API does not trust indexed liquidity blindly. It uses The Graph to discover executable Aqua strategies, then calls the Sepolia `ZubiDubiRouteExecutor.quoteExactIn` function for fresh balance, allowance, Aqua virtual balance, fee, and route-split checks.
 
 The upgraded subgraph also reconstructs a solver-grade market book:
 

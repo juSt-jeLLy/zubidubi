@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "zubidubi:graph-quote": "node scripts/zubidubi-graph-solver.mjs",
+    "zubidubi:solver-api": "node scripts/zubidubi-solver-api.mjs",
     "zubidubi:pendle-benchmark": "cd swap-vm && forge test --match-test test_ZubiDubiPendleMainnetFork_RoutesRealPtUsd3EarlyExit -vv",
     "zubidubi:pyth:update-sepolia": "node scripts/update-pyth-sepolia.mjs",
     "zubidubi:substreams:check": "cargo check --manifest-path substreams/aqua-liquidity/Cargo.toml"
@@ -15,6 +16,7 @@
   "type": "commonjs",
   "dependencies": {
     "@1inch/aqua-sdk": "^0.3.1",
-    "@1inch/swap-vm-sdk": "^0.4.1"
+    "@1inch/swap-vm-sdk": "^0.4.1",
+    "viem": "^2.36.0"
   }
 }
