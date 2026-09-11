@@ -146,5 +146,5 @@ export const demoClaimSummary = {
   title: "Acquire demo claims",
   body: "Deposit real Sepolia WETH, USDC, or LINK into a PT-style receipt contract, receive a transferable maturing claim, then sell it early through ZubiDubi or redeem it 1:1 after maturity.",
   production:
-    "In production this same slot is a Pendle PT, withdrawal receipt, vault claim, bridge receipt, or any transferable delayed-redemption asset.",
+    "In production this same slot is a principal-token receipt, withdrawal receipt, vault claim, bridge receipt, or any transferable delayed-redemption asset.",
 };

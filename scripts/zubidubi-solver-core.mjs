@@ -166,7 +166,7 @@ export async function quoteZubiDubiRoute(options = {}) {
 
   const formatted = {
     product: 'ZubiDubi self-custodial term-liquidity solver',
-    thesis: 'Makers quote programmable risk curves for Pendle-like maturing assets through Aqua; sellers get instant USDC without locked pools.',
+    thesis: 'Programmable term-liquidity books for delayed-redemption assets: Aqua holds maker liquidity in-wallet, while reusable SwapVM instructions price term risk.',
     source: 'the-graph-studio + sepolia-rpc',
     graphEndpoint: config.endpoint,
     routeExecutor: config.deployment.routeExecutor,
@@ -233,7 +233,7 @@ export async function listZubiDubiMarkets(options = {}) {
   const graphData = await graphRequest(options.endpoint || config.endpoint, MARKETS_QUERY)
   return {
     product: 'ZubiDubi self-custodial term-liquidity network',
-    thesis: 'Aqua makers share wallet-held liquidity across a term book of maturing PT-style assets.',
+    thesis: 'Aqua makers share wallet-held liquidity across programmable term-liquidity books for maturing PT-style assets.',
     graphEndpoint: options.endpoint || config.endpoint,
     ...graphData,
   }
@@ -381,7 +381,7 @@ export async function buildMakerStrategy(options = {}) {
 
   return {
     product: 'ZubiDubi maker strategy builder',
-    source: 'config/zubidubi-markets.json + SwapVM modular opcodes',
+    source: 'config/zubidubi-markets.json + reusable SwapVM term-liquidity instruction library',
     chainId: marketConfig.chainId,
     core: {
       aqua: marketConfig.core.aqua,

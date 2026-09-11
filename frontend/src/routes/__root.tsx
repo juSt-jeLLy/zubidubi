@@ -84,14 +84,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "Self-custodial term liquidity for Pendle-like maturing DeFi assets, powered by Aqua and modular SwapVM instructions.",
+          "Self-custodial term-liquidity network for delayed-redemption DeFi assets, powered by Aqua and a modular SwapVM instruction library.",
       },
       { name: "author", content: "ZubiDubi" },
       { property: "og:title", content: "ZubiDubi" },
       {
         property: "og:description",
         content:
-          "Maker-routed early exits for PT tokens and delayed-redemption receipts without locked pools.",
+          "Programmable term-liquidity books for PT tokens and delayed-redemption assets without locked pools.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

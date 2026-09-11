@@ -1,10 +1,10 @@
 # ZubiDubi
 
-Self-custodial term liquidity for delayed-redemption DeFi assets.
+Self-custodial term-liquidity network for delayed-redemption DeFi assets.
 
 ## One-line pitch
 
-AquaExit Term Curve lets makers provide wallet-native exit liquidity for LRTs, LST withdrawal receipts, PT/yield tokens, vault withdrawal shares, and other delayed-redemption assets. A custom SwapVM instruction prices each fill from a term-discount curve using redemption time, oracle backing value, depeg risk, and maker exposure, while Aqua pulls maker funds only at atomic settlement.
+ZubiDubi is a self-custodial term-liquidity network for Pendle-like maturing DeFi assets. Makers quote programmable term-risk curves through Aqua using a reusable modular SwapVM instruction library, while sellers get instant USDC/WETH without makers locking capital into isolated pools.
 
 ## Why this project exists
 
@@ -54,7 +54,7 @@ Useful references:
 
 The research-backed conclusion:
 
-DeFi already has many assets that are tradable today but redeemable later. Their fair price depends on time, risk, backing value, and liquidity stress. ZubiDubi turns that into an Aqua-native liquidity primitive where makers quote those risks from wallet-held liquidity instead of locking capital into many separate pools.
+DeFi already has many assets that are tradable today but redeemable later. Their fair price depends on time, risk, backing value, and liquidity stress. ZubiDubi turns that into an Aqua-native term-liquidity primitive where makers quote those risks from wallet-held liquidity instead of locking capital into many separate pools.
 
 ## Demo economics vs production economics
 
@@ -87,7 +87,7 @@ Frontend implication: the app can show both sides without inventing fake economi
 
 ## The combined idea
 
-This project combines two ideas into one larger primitive.
+This project combines two ideas into one larger primitive: a programmable term-liquidity book.
 
 ### AquaExit
 
@@ -97,7 +97,7 @@ Makers keep liquid assets such as USDC, WETH, or ETH in their own wallets. They 
 
 "I am willing to buy delayed-redemption assets, but only at a discount that compensates me for duration, depeg risk, oracle risk, and my current exposure."
 
-Takers sell delayed-redemption assets and receive liquid tokens immediately.
+Takers convert delayed-redemption assets into liquid tokens immediately through the term-liquidity book.
 
 ### AquaTerm
 
@@ -109,11 +109,23 @@ The longer the redemption delay, the larger the discount. As the asset approache
 
 ### Combined primitive
 
-AquaExit Term Curve is a self-custodial market where one maker wallet can quote many delayed-exit assets using executable term-discount curves.
+AquaExit Term Curve is a self-custodial term-liquidity book where one maker wallet can quote many delayed-exit assets using executable term-discount curves.
 
 This is not a generic payment app and not a simple swap UI. It is a new Aqua-native DeFi position:
 
-Wallet-native term liquidity for delayed exits.
+Wallet-native term-liquidity books for delayed exits.
+
+## Reusable SwapVM instruction library
+
+ZubiDubi should always be described as a modular instruction library, not as one ZubiDubi-only mega-opcode.
+
+The reusable term-liquidity instructions are:
+
+- `BACKING_ORACLE_CHECK`: validates oracle-backed value, staleness, asset pair, maturity window, and optional cross-oracle deviation.
+- `EXPOSURE_CAP`: enforces maker receipt inventory, max exposure, max quote notional, and executable liquidity limits.
+- `DISCOUNT_CURVE_1D`: computes the term-liquidity quote from time to maturity, base discount, annualized discount rate, convexity, liquidity depth, risk tier, and maker inventory.
+
+The DAO/protocol revenue fee stays in `ZubiDubiRouteExecutor`, because fee policy is route-level accounting rather than reusable curve math. That keeps the instruction library reusable for other Aqua apps.
 
 ## What the taker does
 
@@ -197,7 +209,7 @@ The price depends on:
 - Trade direction.
 - Solvency at execution.
 
-SwapVM is where this logic belongs. The custom instruction computes the price during execution and writes the swap amounts into the VM context before settlement.
+SwapVM is where this logic belongs. The modular instruction library computes and validates the term-liquidity price during execution, then writes the swap amounts into the VM context before settlement.
 
 SwapVM gives us the programmable pricing and validation layer.
 
@@ -216,7 +228,7 @@ AquaExit Term Curve is:
 So the main router should be a modified Aqua AMM-style router:
 
 - Use `AquaSwapVMRouter`.
-- Add Aqua-compatible custom instructions.
+- Add Aqua-compatible reusable term-liquidity instructions.
 - Do not deploy full `SwapVMRouter`.
 - Do not depend on `LimitSwapVMRouter` unless we later build a separate limit-order variant.
 
@@ -340,7 +352,7 @@ One Aqua opcode slot is reserved for index stability. Current contracts, tests, 
 - `EXPOSURE_CAP`: enforces maker receipt exposure and quote-token notional limits before a fill can execute.
 - `EXIT_DISCOUNT_CURVE`: computes exact-in or exact-out pricing from backing value, time to maturity, max discount, inventory exposure, liquidity depth, and risk tier.
 
-The DAO/protocol revenue fee stays in `ZubiDubiRouteExecutor`, because fees are route-level accounting rather than per-curve math. This keeps the opcodes reusable for any app that wants term liquidity without forcing one fee policy.
+The DAO/protocol revenue fee stays in `ZubiDubiRouteExecutor`, because fees are route-level accounting rather than per-curve math. This keeps the instructions reusable for any app that wants term-liquidity markets without forcing one fee policy.
 
 ## Contract components
 
@@ -369,7 +381,7 @@ It represents a transferable delayed-redemption claim. The receipt stores:
 - The maturity timestamp.
 - The amount of underlying assets redeemable per receipt.
 
-Before maturity, sellers can exit through ZubiDubi by selling the receipt into Aqua maker liquidity. After maturity, receipt holders can redeem the receipt for the underlying. This makes `zbETH` a concrete delayed claim, not a hardcoded token with no economic anchor.
+Before maturity, holders can exit through ZubiDubi by routing the maturing claim into Aqua maker liquidity. After maturity, receipt holders can redeem the receipt for the underlying. This makes `zbETH` a concrete delayed claim, not a hardcoded token with no economic anchor.
 
 ### Oracle mock
 
@@ -461,15 +473,15 @@ The current implementation charges an output fee in `ZubiDubiRouteExecutor`, so 
 
 Requirement: create a custom Aqua app.
 
-Fit: AquaExit is a custom Aqua strategy for delayed-redemption liquidity.
+Fit: ZubiDubi is a custom Aqua strategy for self-custodial term-liquidity books.
 
 Requirement: sophisticated DeFi position.
 
 Fit: maker positions are term-discount curves with oracle/risk/exposure pricing.
 
-Requirement: use SwapVM, optional custom opcodes.
+Requirement: use SwapVM, optional custom/reusable instructions.
 
-Fit: new custom SwapVM instruction prices the delayed asset at execution.
+Fit: a reusable modular SwapVM instruction library prices and validates the term-liquidity fill at execution.
 
 Requirement: onchain token transfers.
 
@@ -501,31 +513,19 @@ Out-of-scope checks:
 
 Novelty framing:
 
-AquaExit is not "another LRT swapper." It is a reusable term-liquidity primitive for delayed-redemption assets.
+ZubiDubi is not "another LRT swapper." It is a reusable self-custodial term-liquidity network for delayed-redemption assets.
 
 Incubator framing:
 
 The incubator explicitly calls out LST/LRT and yield-bearing assets as underserved asset classes. ZubiDubi is built exactly for that category: it gives those assets a programmable exit-liquidity layer, prices them through oracle and term-structure logic, and creates a direct revenue path through per-fill DAO fees.
 
-## Comparison to past winners
+## Novelty Summary
 
-### ArcBook
+ZubiDubi creates executable term-discount curves for delayed-redemption assets.
 
-ArcBook created executable curves for order books.
+It uses SwapVM to create a new exit-liquidity underwriting structure.
 
-AquaExit creates executable term-discount curves for delayed exits.
-
-### RiverSwap
-
-RiverSwap used SwapVM to create a new LP fee/AMM market structure.
-
-AquaExit uses SwapVM to create a new exit-liquidity underwriting structure.
-
-### Lotus
-
-Lotus created one-way directional liquidity for big holders.
-
-AquaExit creates one-way exit liquidity for delayed-redemption assets.
+It creates one-way term liquidity for maturing claims, with maker inventory and risk limits enforced at fill time.
 
 ### TenorFi
 
@@ -541,7 +541,7 @@ AquaExit is the actual strategy:
 
 - It has a concrete DeFi market problem.
 - It has a new LP position.
-- It has a custom curve.
+- It has a programmable term-risk curve.
 - It needs SwapVM changes.
 - It has a direct taker swap.
 - It supports revenue sharing.
@@ -679,9 +679,9 @@ What still separates us from the most complete winners:
 
 Current winner-track assessment without frontend:
 
-- Stronger than a basic Aqua app because ZubiDubi now has a real DeFi problem, custom modular SwapVM instructions, onchain Sepolia transfers, DAO revenue, live Graph indexing, a Graph-backed solver, Substreams groundwork, invariant tests, and a real Pendle PT fork proof.
-- Competitive with Ballast-style technical depth because both use real/forked assets, oracle-aware pricing, and custom SwapVM logic; ZubiDubi adds multi-strategy routing, revenue accounting, and receipt lifecycle hardening.
-- Still behind ArcBook/Lotus/RiverSwap as a complete submission surface until the frontend/API layer and distinct public maker demo are added.
+- Stronger than a basic Aqua app because ZubiDubi now has a real DeFi problem, a reusable modular SwapVM instruction library, onchain Sepolia transfers, DAO revenue, live Graph indexing, a Graph-backed solver, Substreams groundwork, invariant tests, and a real Pendle PT fork proof.
+- Competitive with Ballast-style technical depth because both use real/forked assets and oracle-aware pricing; ZubiDubi adds a reusable term-liquidity instruction library, multi-strategy routing, revenue accounting, and receipt lifecycle hardening.
+- Still behind a fully polished final submission surface until the frontend/API layer and distinct public maker demo are tightened.
 - The highest-leverage next contract/script upgrade is not another curve: it is a public multi-maker deployment script that funds 2-3 maker EOAs, ships different risk curves, executes one route across them, and leaves every event indexed by The Graph.
 
 These are product-surface gaps, not core protocol gaps. The protocol, live deployment, and Graph-backed market reconstruction are now in place.
@@ -722,7 +722,7 @@ These are product-surface gaps, not core protocol gaps. The protocol, live deplo
 
 Mitigation:
 
-Frame it as a term-liquidity primitive, not a token swapper.
+Frame it as a programmable term-liquidity book, not a token swapper.
 
 ### Risk: future settlement trust issue
 
@@ -740,7 +740,7 @@ Start with mock oracle and clean interface. Add real fork oracle later.
 
 Mitigation:
 
-First custom instruction can combine pricing checks. Split into multiple reusable opcodes after tests pass.
+Historical note: the first prototype combined pricing checks. The current implementation is split into reusable term-liquidity instructions.
 
 ### Risk: free tradability undercuts the "early exit" framing
 
@@ -798,15 +798,15 @@ Use `AquaSwapVMRouter`, not full `SwapVMRouter`.
 
 ### Completed
 
-- Phase 1: custom `AquaExitTerm` SwapVM instruction added to the local `AquaSwapVMRouter` opcode table.
-- Phase 2: Aqua settlement tests prove a taker can sell delayed-exit receipt tokens and receive maker wallet-held quote tokens.
+- Phase 1: reusable `AquaExitTerm` SwapVM instruction library added to the local `AquaSwapVMRouter` opcode table.
+- Phase 2: Aqua settlement tests prove a taker can convert delayed-exit receipt tokens into maker wallet-held quote tokens.
 - Phase 3: `ZubiDubiRouteExecutor` added. It quotes, filters, sorts, and atomically executes routed exits across multiple Aqua strategies.
 - Phase 4: TypeScript SDK support added for encoding and building the modular `aquaExitTermLibrary()` instruction sequence.
 - Phase 5: executable Foundry demo added in `swap-vm/test/ZubiDubiDemo.t.sol`.
 - Phase 6: receipt token upgraded into an underlying-backed delayed-redemption receipt with maturity-gated redemption.
 - Phase 7: term curve upgraded with hard max exposure and maker inventory pricing.
 - Phase 8: route executor upgraded with protocol fee revenue and partial-fill recovery through binary search.
-- Phase 9: maker risk policy added to the custom opcode: max notional, allowed asset pair, maturity range, stale oracle protection, liquidity-depth penalty, and risk-tier haircut.
+- Phase 9: maker risk policy added to the modular instruction library: max notional, allowed asset pair, maturity range, stale oracle protection, liquidity-depth penalty, and risk-tier haircut.
 - Phase 10: route tests added for revoked approvals, moved maker wallet balances, same-maker double counting, max fills, protocol fees, multi-maker splits, multi-asset markets, and Sepolia real Chainlink/USDC execution.
 - Phase 11: `AquaExitTerm` split into reusable SwapVM instructions for backing/oracle checks, exposure caps, and discount-curve pricing. The SDK exposes `aquaExitTermLibrary()`, and Sepolia scripts now publish modular programs.
 - Sepolia: deployed Aqua, modular-instruction AquaSwapVMRouter, zbETH receipt token, and route executor with real Sepolia USDC and Chainlink ETH/USD configuration.
@@ -886,7 +886,7 @@ Delayed-redemption DeFi assets are liquid wrappers around illiquid exits. Liquid
 
 Solution:
 
-Makers publish self-custodial term-liquidity strategies through Aqua. Takers sell delayed assets for liquid tokens immediately. SwapVM prices each fill from a maturity/risk/exposure curve and Aqua settles atomically from maker wallets.
+Makers publish self-custodial term-liquidity strategies through Aqua. Takers convert delayed assets into liquid tokens immediately. The modular SwapVM instruction library prices each fill from a maturity/risk/exposure curve and Aqua settles atomically from maker wallets.
 
 Design decision (on purpose):
 
@@ -906,6 +906,6 @@ Hey @Stepan @Belac, we are building AquaExit Term Curve for the Aqua track.
 
 The problem: many DeFi assets are liquid wrappers around delayed exits, like LRTs, LST withdrawal receipts, PT/yield tokens, and vault withdrawal shares. In stress, users need immediate exit liquidity, but LPs do not want to lock idle USDC/ETH into separate pools for every asset and maturity.
 
-AquaExit lets makers publish self-custodial exit-liquidity strategies through Aqua. Their funds stay in their wallets, while takers can sell delayed-redemption assets for liquid tokens immediately. A custom SwapVM instruction prices each fill using redemption delay, oracle backing value, depeg/risk haircut, and maker exposure. Settlement is atomic: maker pays USDC/WETH now and receives the claim token now, so there is no future allowance/rug-pull dependency.
+ZubiDubi lets makers publish self-custodial term-liquidity strategies through Aqua. Their funds stay in their wallets, while takers convert delayed-redemption assets into liquid tokens immediately. A reusable modular SwapVM instruction library prices each fill using redemption delay, oracle backing value, depeg/risk haircut, and maker exposure. Settlement is atomic: maker pays USDC/WETH now and receives the claim token now, so there is no future allowance/rug-pull dependency.
 
 We plan to demo a modified AquaSwapVMRouter with one exit split across multiple Aqua maker positions, plus fair claim distribution and maker earnings by filled exposure. Does this feel aligned with Aqua's goal of novel LST/LRT/yield-bearing strategies?

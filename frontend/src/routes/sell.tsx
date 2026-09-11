@@ -52,7 +52,7 @@ export const Route = createFileRoute("/sell")({
       {
         property: "og:description",
         content:
-          "Transparent per-maker fill breakdown, benchmarked against the Pendle market rate.",
+          "Transparent per-maker fill breakdown with live route previews.",
       },
     ],
   }),

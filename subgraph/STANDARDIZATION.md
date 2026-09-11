@@ -1,6 +1,6 @@
 # Graph Bounty Fit
 
-ZubiDubi uses The Graph as the market data plane for Aqua/SwapVM strategies.
+ZubiDubi uses The Graph as the market data plane for programmable Aqua/SwapVM term-liquidity books.
 
 ## Standardized Schema Leverage
 
@@ -48,7 +48,7 @@ The root app command `npm run zubidubi:graph-quote` uses this subgraph as the so
 
 This is the same pattern a frontend and production solver should use: The Graph narrows the market, then contracts perform final freshness checks and atomic settlement.
 
-Compared to a basic event indexer, this gives ZubiDubi the same category of data plane that stronger Aqua projects used: an indexed live market that a deterministic solver can consume.
+Compared to a basic event indexer, this gives ZubiDubi the same category of data plane that stronger Aqua projects used: an indexed live term-liquidity market that a deterministic solver can consume.
 
 ## Future Substreams Upgrade
 

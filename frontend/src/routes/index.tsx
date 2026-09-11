@@ -19,17 +19,17 @@ import { MARKETS, fmtCompact } from "@/lib/zubi-data";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "ZubiDubi - Self-custodial term liquidity" },
+      { title: "ZubiDubi - Self-custodial term-liquidity network" },
       {
         name: "description",
         content:
-          "ZubiDubi gives PT tokens and delayed-redemption DeFi assets instant exit liquidity through Aqua maker strategies and modular SwapVM risk curves.",
+          "ZubiDubi creates programmable term-liquidity books for PT tokens and delayed-redemption DeFi assets through Aqua maker strategies and a modular SwapVM instruction library.",
       },
-      { property: "og:title", content: "ZubiDubi - Self-custodial term liquidity" },
+      { property: "og:title", content: "ZubiDubi - Self-custodial term-liquidity network" },
       {
         property: "og:description",
         content:
-          "A term-liquidity network where makers quote programmable risk curves and sellers get instant USDC without locked pools.",
+          "A self-custodial term-liquidity network where makers quote programmable risk curves and sellers get instant USDC without locked pools.",
       },
     ],
   }),
@@ -48,17 +48,15 @@ function LandingPage() {
           <div>
             <Badge variant="outline" className="mb-6 border-primary/40 text-primary">
               <span className="mr-1.5 size-1.5 rounded-full bg-primary live-dot" />
-              Aqua + modular SwapVM
+              Aqua + modular SwapVM instruction library
             </Badge>
-            <h1 className="max-w-4xl text-4xl font-bold leading-[1.05] sm:text-6xl">
-              ZubiDubi
-            </h1>
+            <h1 className="max-w-4xl text-4xl font-bold leading-[1.05] sm:text-6xl">ZubiDubi</h1>
             <p className="mt-5 max-w-2xl text-xl font-medium text-foreground">
-              Self-custodial term liquidity for Pendle-like maturing DeFi assets.
+              Self-custodial term-liquidity network for delayed-redemption DeFi assets.
             </p>
             <p className="mt-4 max-w-2xl text-base text-muted-foreground">
-              Makers keep liquidity in their wallets, publish risk-aware discount curves, and let sellers exit PT
-              tokens or delayed-redemption receipts into USDC before maturity.
+              Makers keep liquidity in their wallets, publish executable term-risk curves, and let
+              sellers exit maturing positions into USDC/WETH before maturity without locked pools.
             </p>
 
             <div className="mt-9 flex flex-wrap gap-3">
@@ -68,19 +66,13 @@ function LandingPage() {
                 </Link>
               </Button>
               <Button asChild variant="outline" className="font-semibold">
-                <Link to="/sell">
-                  Sell a position
-                </Link>
+                <Link to="/sell">Sell a position</Link>
               </Button>
               <Button asChild variant="outline" className="font-semibold">
-                <a href="/portfolio#acquire">
-                  Get demo assets
-                </a>
+                <a href="/portfolio#acquire">Get demo assets</a>
               </Button>
               <Button asChild variant="ghost" className="font-semibold text-muted-foreground">
-                <Link to="/make">
-                  Make a strategy
-                </Link>
+                <Link to="/make">Make a strategy</Link>
               </Button>
             </div>
           </div>
@@ -90,10 +82,26 @@ function LandingPage() {
               <h2 className="text-sm font-semibold uppercase tracking-widest">Live thesis</h2>
             </div>
             <div className="grid gap-px bg-border">
-              <Proof label="Wallet-held liquidity" value={fmtCompact(totalLiquidity)} icon={<Layers3 className="size-4" />} />
-              <Proof label="Maturing asset markets" value={`${MARKETS.length} listed`} icon={<Clock3 className="size-4" />} />
-              <Proof label="Real PT-style assets" value={`${realMarkets} benchmarked`} icon={<CircleDollarSign className="size-4" />} />
-              <Proof label="DAO revenue path" value="10 bps fee" icon={<BadgeDollarSign className="size-4" />} />
+              <Proof
+                label="Wallet-held liquidity"
+                value={fmtCompact(totalLiquidity)}
+                icon={<Layers3 className="size-4" />}
+              />
+              <Proof
+                label="Maturing asset markets"
+                value={`${MARKETS.length} listed`}
+                icon={<Clock3 className="size-4" />}
+              />
+              <Proof
+                label="Real PT-style assets"
+                value={`${realMarkets} benchmarked`}
+                icon={<CircleDollarSign className="size-4" />}
+              />
+              <Proof
+                label="DAO revenue path"
+                value="10 bps fee"
+                icon={<BadgeDollarSign className="size-4" />}
+              />
             </div>
           </div>
         </div>
@@ -114,7 +122,7 @@ function LandingPage() {
           <ProblemCard
             title="The ZubiDubi fix"
             icon={<ShieldCheck className="size-5" />}
-            text="Aqua lets makers quote many exits from wallet-held funds, while SwapVM prices duration, oracle risk and exposure."
+            text="Aqua lets makers quote many exits from wallet-held funds, while reusable SwapVM instructions price duration, oracle risk and exposure."
           />
         </div>
       </section>
@@ -127,9 +135,9 @@ function LandingPage() {
             </Badge>
             <h2 className="text-2xl font-semibold">The discount happens at early exit.</h2>
             <p className="mt-3 text-sm text-muted-foreground">
-              Sepolia receipts are par-backed so the demo has a real redemption anchor. In production,
-              the seller usually arrives with a Pendle PT, withdrawal receipt, vault claim or bridge
-              claim that already matures later.
+              Sepolia receipts are par-backed so the demo has a real redemption anchor. In
+              production, the seller usually arrives with a principal-token receipt, withdrawal
+              receipt, vault claim or bridge claim that already matures later.
             </p>
           </div>
           <div className="grid gap-px overflow-hidden rounded-lg border border-border bg-border md:grid-cols-3">
@@ -158,7 +166,8 @@ function LandingPage() {
             <div>
               <h2 className="text-2xl font-semibold">How the trade clears</h2>
               <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                The app is not a normal AMM screen. It is a routeable early-exit market over executable maker curves.
+                The app is not a normal AMM screen. It is a routeable early-exit market over
+                executable maker curves.
               </p>
             </div>
             <Button asChild variant="outline">
@@ -169,10 +178,26 @@ function LandingPage() {
           </div>
 
           <div className="grid gap-px overflow-hidden rounded-lg border border-border bg-border lg:grid-cols-4">
-            <Step n="01" title="Discover" text="Indexed maker strategies expose assets, maturities, quote liquidity and risk limits." />
-            <Step n="02" title="Quote" text="SwapVM computes a term discount from maturity, oracle backing value, exposure and risk tier." />
-            <Step n="03" title="Split" text="The solver ranks executable fills, skips unsafe makers and splits the seller amount atomically." />
-            <Step n="04" title="Settle" text="Aqua pulls maker funds only at execution, transfers receipts to makers, and routes fees." />
+            <Step
+              n="01"
+              title="Discover"
+              text="Indexed maker strategies expose assets, maturities, quote liquidity and risk limits."
+            />
+            <Step
+              n="02"
+              title="Quote"
+              text="SwapVM computes a term discount from maturity, oracle backing value, exposure and risk tier."
+            />
+            <Step
+              n="03"
+              title="Split"
+              text="The solver ranks executable fills, skips unsafe makers and splits the seller amount atomically."
+            />
+            <Step
+              n="04"
+              title="Settle"
+              text="Aqua pulls maker funds only at execution, transfers receipts to makers, and routes fees."
+            />
           </div>
         </div>
       </section>
@@ -182,15 +207,32 @@ function LandingPage() {
           <div>
             <h2 className="text-2xl font-semibold">Why it is more than a swap</h2>
             <p className="mt-3 text-sm text-muted-foreground">
-              A normal pool has no opinion about maturity. ZubiDubi quotes against time-to-redemption,
-              maker inventory, backing oracles and exposure caps, then proves the route through onchain settlement.
+              A normal pool has no opinion about maturity. ZubiDubi quotes against
+              time-to-redemption, maker inventory, backing oracles and exposure caps, then proves
+              the route through onchain settlement.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Signal icon={<GitBranch className="size-4" />} title="Modular instructions" text="Backing check, discount curve and exposure cap are reusable SwapVM pieces." />
-            <Signal icon={<DatabaseZap className="size-4" />} title="Indexed route surface" text="Strategy discovery is built around indexed market state before final quote checks." />
-            <Signal icon={<ShieldCheck className="size-4" />} title="Solvency protection" text="Unavailable balances, revoked approvals and stale oracle paths are skipped before execution." />
-            <Signal icon={<BadgeDollarSign className="size-4" />} title="Revenue-bearing" text="The fee path is visible in quote, route, portfolio and demo surfaces." />
+            <Signal
+              icon={<GitBranch className="size-4" />}
+              title="Modular instructions"
+              text="Backing check, discount curve and exposure cap are reusable SwapVM pieces."
+            />
+            <Signal
+              icon={<DatabaseZap className="size-4" />}
+              title="Indexed route surface"
+              text="Strategy discovery is built around indexed market state before final quote checks."
+            />
+            <Signal
+              icon={<ShieldCheck className="size-4" />}
+              title="Solvency protection"
+              text="Unavailable balances, revoked approvals and stale oracle paths are skipped before execution."
+            />
+            <Signal
+              icon={<BadgeDollarSign className="size-4" />}
+              title="Revenue-bearing"
+              text="The fee path is visible in quote, route, portfolio and demo surfaces."
+            />
           </div>
         </div>
       </section>

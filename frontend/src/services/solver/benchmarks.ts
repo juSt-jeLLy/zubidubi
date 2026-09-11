@@ -70,7 +70,7 @@ export function buildQuoteBenchmark(quote: SolverQuote | null, market: LiveMarke
       label: comparableToPar ? "Par redemption benchmark" : "Benchmark source",
       value: comparableToPar
         ? `1 ${market.symbol} -> 1 ${market.quoteSymbol} at maturity`
-        : "Onchain oracle curve; external Pendle side-by-side is shown in fork demo",
+        : "Onchain oracle curve; external side-by-side benchmark shown in the fork demo",
       tone: comparableToPar ? "muted" : "warn",
     },
   ];

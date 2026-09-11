@@ -90,22 +90,42 @@ export type MakerFill = {
 
 export function quoteFor(market: Market, amount: number): MakerFill[] {
   const seedRows: Omit<MakerFill, "amount">[] = [
-    { maker: "0x8f21…c4a9", ens: "steadyrate.eth", discount: market.bestDiscount, status: "filled" },
-    { maker: "0x1b90…77de", ens: "convexdesk.eth", discount: market.bestDiscount + 0.18, status: "filled" },
+    {
+      maker: "0x8f21…c4a9",
+      ens: "steadyrate.eth",
+      discount: market.bestDiscount,
+      status: "filled",
+    },
+    {
+      maker: "0x1b90…77de",
+      ens: "convexdesk.eth",
+      discount: market.bestDiscount + 0.18,
+      status: "filled",
+    },
     {
       maker: "0x44c1…9012",
       discount: market.bestDiscount + 0.09,
       status: "skipped-insolvent",
       reason: "Maker collateral below required solvency ratio at quote time.",
     },
-    { maker: "0xaa07…31f5", ens: "lrtvault.eth", discount: market.bestDiscount + 0.31, status: "filled" },
+    {
+      maker: "0xaa07…31f5",
+      ens: "lrtvault.eth",
+      discount: market.bestDiscount + 0.31,
+      status: "filled",
+    },
     {
       maker: "0x6d3e…b8c2",
       discount: market.bestDiscount + 0.12,
       status: "skipped-exposure",
       reason: "Per-asset exposure cap reached (98.4% of 2.0M used).",
     },
-    { maker: "0xf012…5a6b", ens: "tenor.eth", discount: market.bestDiscount + 0.44, status: "filled" },
+    {
+      maker: "0xf012…5a6b",
+      ens: "tenor.eth",
+      discount: market.bestDiscount + 0.44,
+      status: "filled",
+    },
     {
       maker: "0x93bd…10aa",
       discount: market.bestDiscount + 0.05,
@@ -127,12 +147,48 @@ export type Activity = {
 };
 
 export const ACTIVITY: Activity[] = [
-  { kind: "strategy", text: "Strategy shipped · Chainlink ETH/USDC ratio", asset: "PT-zbETH-30D", value: "$25", ago: "now" },
-  { kind: "strategy", text: "Strategy shipped · Chainlink ETH/WETH ratio", asset: "PT-zbETH-30D", value: "0.02 WETH", ago: "now" },
-  { kind: "strategy", text: "Strategy shipped · Chainlink USDC/USDC ratio", asset: "PT-zbUSD-30D", value: "$50", ago: "1m" },
-  { kind: "strategy", text: "Strategy shipped · Chainlink LINK/USDC ratio", asset: "PT-zbLINK-30D", value: "$30", ago: "1m" },
-  { kind: "strategy", text: "Strategy shipped · 180D inventory curve", asset: "PT-zbLINK-180D", value: "0.08 WETH", ago: "2m" },
-  { kind: "redeem", text: "Maturity-gated redemption enabled", asset: "PT-zbUSD-180D", value: "1:1 USDC", ago: "2m" },
+  {
+    kind: "strategy",
+    text: "Strategy shipped · Chainlink ETH/USDC ratio",
+    asset: "PT-zbETH-30D",
+    value: "$25",
+    ago: "now",
+  },
+  {
+    kind: "strategy",
+    text: "Strategy shipped · Chainlink ETH/WETH ratio",
+    asset: "PT-zbETH-30D",
+    value: "0.02 WETH",
+    ago: "now",
+  },
+  {
+    kind: "strategy",
+    text: "Strategy shipped · Chainlink USDC/USDC ratio",
+    asset: "PT-zbUSD-30D",
+    value: "$50",
+    ago: "1m",
+  },
+  {
+    kind: "strategy",
+    text: "Strategy shipped · Chainlink LINK/USDC ratio",
+    asset: "PT-zbLINK-30D",
+    value: "$30",
+    ago: "1m",
+  },
+  {
+    kind: "strategy",
+    text: "Strategy shipped · 180D inventory curve",
+    asset: "PT-zbLINK-180D",
+    value: "0.08 WETH",
+    ago: "2m",
+  },
+  {
+    kind: "redeem",
+    text: "Maturity-gated redemption enabled",
+    asset: "PT-zbUSD-180D",
+    value: "1:1 USDC",
+    ago: "2m",
+  },
 ];
 
 export type Strategy = {
@@ -317,12 +373,48 @@ export type OracleSource = {
 };
 
 export const ORACLE_SOURCES: OracleSource[] = [
-  { name: "Chainlink ETH/USD", scope: "Underlying backing value", freshness: "14s", deviationBps: 0, state: "primary" },
-  { name: "Chainlink USDC/USD", scope: "USD receipt backing value", freshness: "1 block", deviationBps: 0, state: "primary" },
-  { name: "Chainlink LINK/USD", scope: "LINK receipt backing value", freshness: "1 block", deviationBps: 0, state: "primary" },
-  { name: "Pyth ETH/USD", scope: "Dual-oracle guard for ETH markets", freshness: "8s", deviationBps: 7, state: "secondary" },
-  { name: "Pendle PT-USD3", scope: "Mainnet-fork benchmark rate", freshness: "1 block", deviationBps: 31, state: "benchmark" },
-  { name: "Subgraph Studio", scope: "Strategy discovery", freshness: "Live", deviationBps: 0, state: "benchmark" },
+  {
+    name: "Chainlink ETH/USD",
+    scope: "Underlying backing value",
+    freshness: "14s",
+    deviationBps: 0,
+    state: "primary",
+  },
+  {
+    name: "Chainlink USDC/USD",
+    scope: "USD receipt backing value",
+    freshness: "1 block",
+    deviationBps: 0,
+    state: "primary",
+  },
+  {
+    name: "Chainlink LINK/USD",
+    scope: "LINK receipt backing value",
+    freshness: "1 block",
+    deviationBps: 0,
+    state: "primary",
+  },
+  {
+    name: "Pyth ETH/USD",
+    scope: "Dual-oracle guard for ETH markets",
+    freshness: "8s",
+    deviationBps: 7,
+    state: "secondary",
+  },
+  {
+    name: "PT-USD3 (real-asset fork)",
+    scope: "Mainnet-fork benchmark rate",
+    freshness: "1 block",
+    deviationBps: 31,
+    state: "benchmark",
+  },
+  {
+    name: "Subgraph Studio",
+    scope: "Strategy discovery",
+    freshness: "Live",
+    deviationBps: 0,
+    state: "benchmark",
+  },
 ];
 
 export type PlaygroundRun = {
@@ -346,9 +438,9 @@ export const PLAYGROUND_RUNS: PlaygroundRun[] = [
     state: "ready",
   },
   {
-    label: "Pendle benchmark",
+    label: "Fork benchmark",
     command: "npm run zubidubi:pendle-benchmark",
-    result: "Compares ZubiDubi term curve with live Pendle PT fork price.",
+    result: "Routes a real principal token across maker term curves on a live mainnet fork.",
     state: "verified",
   },
   {
@@ -442,7 +534,8 @@ export function curvePoints(opts: {
     const t = days / 365;
     const linear = opts.base + opts.annualRate * t;
     const shaped = opts.convex
-      ? opts.base + (opts.annualRate * opts.maxDays) / 365 * Math.pow(days / opts.maxDays, opts.convexity)
+      ? opts.base +
+        ((opts.annualRate * opts.maxDays) / 365) * Math.pow(days / opts.maxDays, opts.convexity)
       : linear;
     pts.push({ days: Math.round(days), discount: Math.min(shaped, opts.maxDiscount) });
   }

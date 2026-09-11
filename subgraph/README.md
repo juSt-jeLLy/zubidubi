@@ -1,10 +1,10 @@
 # ZubiDubi Subgraph
 
-Indexes the ZubiDubi Sepolia deployment:
+Indexes the ZubiDubi Sepolia term-liquidity book:
 
 - Aqua strategies shipped, pushed, pulled, and docked.
 - SwapVM fills against Aqua strategies.
-- ZubiDubi routed exits, maker skips, and protocol/DAO fee accrual.
+- ZubiDubi routed term-liquidity exits, maker skips, and protocol/DAO fee accrual.
 - Receipt maturity/redemption metadata from the receipt token contract.
 - Market-level liquidity, volume, exposure, route-fill, price, and revenue reconstruction.
 

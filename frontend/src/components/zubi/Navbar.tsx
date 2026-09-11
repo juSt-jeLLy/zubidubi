@@ -60,7 +60,7 @@ export function Navbar() {
               Zubi<span className="text-primary">Dubi</span>
             </span>
             <span className="hidden text-[10px] uppercase tracking-widest text-muted-foreground sm:block">
-              term liquidity
+              term-liquidity network
             </span>
           </span>
         </Link>
@@ -141,7 +141,7 @@ export function Footer() {
   return (
     <footer className="mt-20 border-t border-border">
       <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-8 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <p>ZubiDubi · self-custodial exit liquidity for maturing DeFi assets.</p>
+        <p>ZubiDubi · programmable term-liquidity books for maturing DeFi assets.</p>
         <div className="flex items-center gap-5">
           <Link to="/playground" className="hover:text-primary">
             Playground

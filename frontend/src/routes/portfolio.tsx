@@ -31,7 +31,7 @@ export const Route = createFileRoute("/portfolio")({
       { property: "og:title", content: "Portfolio - ZubiDubi" },
       {
         property: "og:description",
-        content: "A product surface for holders and makers using Aqua-native term liquidity.",
+        content: "A product surface for holders and makers using Aqua-native term-liquidity books.",
       },
     ],
   }),

@@ -10,10 +10,10 @@ const port = Number(process.env.PORT || process.env.ZUBIDUBI_SOLVER_PORT || 8787
 
 const pitch = {
   name: 'ZubiDubi',
-  oneLiner: 'A self-custodial term-liquidity network for Pendle-like maturing DeFi assets.',
-  thesis: 'Makers quote programmable risk curves through Aqua and SwapVM; sellers get instant USDC for delayed-redemption assets without LPs locking capital into isolated pools.',
+  oneLiner: 'A self-custodial term-liquidity network for delayed-redemption DeFi assets.',
+  thesis: 'ZubiDubi creates programmable term-liquidity books: makers quote term-risk curves through Aqua and a modular SwapVM instruction library; sellers get instant USDC/WETH for delayed-redemption assets without LPs locking capital into isolated pools.',
   whyAqua: 'Aqua lets one maker wallet share the same USDC across many maturing-asset strategies while settlement still checks real balance, allowance, and virtual liquidity at execution time.',
-  whySwapVM: 'SwapVM turns each maker position into executable pricing logic: oracle backing, maturity discount, inventory exposure, liquidity depth, risk tier, max discount, and stale/deviating oracle protection.',
+  whySwapVM: 'The reusable SwapVM instruction library turns each maker position into executable term-risk logic: BACKING_ORACLE_CHECK, EXPOSURE_CAP, and DISCOUNT_CURVE_1D.',
   demo: 'The API reads the live Subgraph Studio market book, reconstructs executable orders, calls the Sepolia route executor for a fresh quote, and returns a route split that can be executed atomically.',
 }
 
