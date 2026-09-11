@@ -50,6 +50,21 @@ export type PlaygroundProofCard = {
   status: "contract" | "fork" | "graph" | "frontend";
 };
 
+export type PlaygroundTestCase = {
+  name: string;
+  proves: string;
+};
+
+export type PlaygroundTestGroup = {
+  id: string;
+  title: string;
+  file: string;
+  command: string;
+  summary: string;
+  flow: string[];
+  tests: PlaygroundTestCase[];
+};
+
 export type PlaygroundModel = {
   board: MarketBoard | null;
   scenarios: PlaygroundScenario[];

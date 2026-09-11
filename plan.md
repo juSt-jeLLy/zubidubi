@@ -589,7 +589,7 @@ MVP UI can include:
 - Transaction status.
 - Maker earnings/exposure panel.
 - Portfolio page with holdings, strategy exposure, redemption queue, and route history.
-- Playground page with live Graph market state, solver quotes, route split previews, protocol proof timeline, indexed activity, and a deploy-safe test proof catalog.
+- Playground page with live Graph market state, solver quotes, route split previews, protocol proof timeline, indexed activity, main proof catalog, and a deploy-safe visual test map covering curve, routing, guardrail, receipt lifecycle, fork, and indexing proofs.
 
 ## Implementation status
 
