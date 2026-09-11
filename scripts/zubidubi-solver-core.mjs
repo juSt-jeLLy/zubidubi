@@ -198,6 +198,10 @@ export async function quoteZubiDubiRoute(options = {}) {
     skippedMakers: skippedQuotes.map((quote) => ({
       maker: quote.maker,
       orderHash: quote.orderHash,
+      deliverableOut: formatUnits(quote.deliverableOut, quoteTokenDecimals),
+      reason: quote.deliverableOut === 0n
+        ? 'No deliverable maker output after live wallet balance, allowance, and Aqua virtual balance checks.'
+        : 'Skipped by route executor after executable-liquidity and maker policy checks.',
     })),
     execution: canExecute ? {
       routeExecutor: config.deployment.routeExecutor,

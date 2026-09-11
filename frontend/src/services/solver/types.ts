@@ -9,6 +9,8 @@ export type SolverFill = {
 export type SolverSkippedMaker = {
   maker: string;
   orderHash: string;
+  deliverableOut?: string;
+  reason?: string;
 };
 
 export type SolverRouteFill = {

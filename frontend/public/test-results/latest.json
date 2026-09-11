@@ -1,0 +1,36 @@
+{
+  "generatedAt": "2026-09-12",
+  "source": "local Foundry proof run from Codex workspace",
+  "results": [
+    {
+      "id": "curve-tests",
+      "status": "passed",
+      "command": "cd swap-vm && forge test --match-contract AquaExitTermTest -vv"
+    },
+    {
+      "id": "guardrail-tests",
+      "status": "passed",
+      "command": "cd swap-vm && forge test --match-contract AquaExitTermTest --match-test Reverts -vv"
+    },
+    {
+      "id": "multi-maker-routing-tests",
+      "status": "passed",
+      "command": "cd swap-vm && forge test --match-contract ZubiDubiRouteExecutorTest -vv"
+    },
+    {
+      "id": "receipt-lifecycle-tests",
+      "status": "passed",
+      "command": "cd swap-vm && forge test --match-contract ZubiDubiExitReceiptTest -vv"
+    },
+    {
+      "id": "demo-and-indexing-tests",
+      "status": "passed",
+      "command": "cd swap-vm && forge test --match-contract ZubiDubiDemoTest -vv"
+    },
+    {
+      "id": "real-asset-fork-tests",
+      "status": "requires-rpc",
+      "command": "npm run zubidubi:sepolia-inventory-benchmark && MAINNET_RPC_URL=<rpc> npm run zubidubi:pendle-benchmark"
+    }
+  ]
+}

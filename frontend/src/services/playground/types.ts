@@ -33,6 +33,7 @@ export type PlaygroundRouteRow = {
   grossOut: string;
   sharePct: number;
   status: "filled" | "skipped";
+  reason?: string;
 };
 
 export type PlaygroundProtocolStep = {
@@ -46,22 +47,30 @@ export type PlaygroundProofCard = {
   title: string;
   whatItProves: string;
   file: string;
+  line?: number;
   command: string;
   status: "contract" | "fork" | "graph" | "frontend";
+  result?: "passed" | "manual" | "requires-rpc";
+  lastRun?: string;
 };
 
 export type PlaygroundTestCase = {
   name: string;
   proves: string;
+  line?: number;
+  result?: "passed" | "manual" | "requires-rpc";
 };
 
 export type PlaygroundTestGroup = {
   id: string;
   title: string;
   file: string;
+  line?: number;
   command: string;
   summary: string;
   flow: string[];
+  result: "passed" | "manual" | "requires-rpc";
+  lastRun: string;
   tests: PlaygroundTestCase[];
 };
 

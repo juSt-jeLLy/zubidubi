@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Check, Loader2, ShieldAlert, X } from "lucide-react";
+import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ export function RouteSplitPreview({
 }: RouteSplitPreviewProps) {
   const executable = quote?.canExecute ?? false;
   const fillStatus = quote?.fillStatus ?? "NONE";
+  const [expandedSkip, setExpandedSkip] = useState<string | null>(null);
 
   return (
     <section className="panel overflow-hidden">
@@ -118,35 +120,62 @@ export function RouteSplitPreview({
             Quote a scenario to see maker fill legs, skipped makers, and output share.
           </div>
         ) : (
-          rows.map((row) => (
-            <div
-              key={row.id}
-              className={cn(
-                "grid gap-3 px-5 py-4 text-sm lg:grid-cols-[140px_1fr_120px_120px_90px] lg:items-center",
-                row.status === "skipped" && "bg-surface-2/50 opacity-80",
-              )}
-            >
-              <Badge
-                variant="outline"
+          rows.map((row) => {
+            const skipped = row.status === "skipped";
+            const expanded = expandedSkip === row.id;
+            return (
+              <div
+                key={row.id}
                 className={cn(
-                  "w-fit gap-1",
-                  row.status === "filled"
-                    ? "border-success/40 text-success"
-                    : "border-border-strong text-muted-foreground",
+                  "px-5 py-4 text-sm",
+                  skipped && "bg-surface-2/50 opacity-90",
                 )}
               >
-                {row.status === "filled" ? <Check className="size-3" /> : <X className="size-3" />}
-                {row.status}
-              </Badge>
-              <div className="min-w-0">
-                <p className="num truncate">{short(row.maker)}</p>
-                <p className="num mt-0.5 truncate text-xs text-muted-foreground">{short(row.orderHash)}</p>
+                <button
+                  type="button"
+                  onClick={() => skipped && setExpandedSkip(expanded ? null : row.id)}
+                  className="grid w-full gap-3 text-left lg:grid-cols-[160px_1fr_120px_120px_90px] lg:items-center"
+                >
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "w-fit gap-1",
+                      row.status === "filled"
+                        ? "border-success/40 text-success"
+                        : "border-warning/40 bg-warning/10 text-warning",
+                    )}
+                  >
+                    {row.status === "filled" ? <Check className="size-3" /> : <X className="size-3" />}
+                    {row.status === "filled" ? "filled" : "skipped · deliverability"}
+                  </Badge>
+                  <div className="min-w-0">
+                    <p className="num truncate">{short(row.maker)}</p>
+                    <p className="num mt-0.5 truncate text-xs text-muted-foreground">
+                      {short(row.orderHash)}
+                    </p>
+                  </div>
+                  <p className="num text-muted-foreground">{skipped ? "--" : fmt(row.fillIn)}</p>
+                  <p className="num text-primary">{skipped ? "--" : fmt(row.grossOut)}</p>
+                  <p className="num text-right">{skipped ? "0%" : `${fmt(row.sharePct, 2)}%`}</p>
+                </button>
+
+                {skipped ? (
+                  <div
+                    className={cn(
+                      "mt-3 flex gap-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-muted-foreground",
+                      !expanded && "line-clamp-2",
+                    )}
+                  >
+                    <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" />
+                    <span>
+                      {row.reason ??
+                        "Skipped by route executor because this maker could not contribute deliverable output for this route."}
+                    </span>
+                  </div>
+                ) : null}
               </div>
-              <p className="num text-muted-foreground">{fmt(row.fillIn)}</p>
-              <p className="num text-primary">{fmt(row.grossOut)}</p>
-              <p className="num text-right">{fmt(row.sharePct, 2)}%</p>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </section>

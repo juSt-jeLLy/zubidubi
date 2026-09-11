@@ -102,6 +102,9 @@ export function buildRouteRows(quote: SolverQuote | null): PlaygroundRouteRow[] 
     grossOut: "0",
     sharePct: 0,
     status: "skipped" as const,
+    reason:
+      maker.reason ??
+      "Skipped by route executor because this maker could not contribute deliverable output for the route.",
   }));
 
   return [...fills, ...skipped];

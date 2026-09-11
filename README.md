@@ -258,7 +258,8 @@ config/zubidubi-markets.json
 | `frontend/src/services/playground/` | deploy-safe playground scenarios, quote mapping, proof catalog, and route preview model |
 | `frontend/src/components/zubi/AcquireDemoClaims.tsx` | popup flow to deposit backing and mint a maturing claim |
 | `frontend/src/components/zubi/QuoteBenchmarkPanel.tsx` | quote context and maturity/par benchmark |
-| `frontend/src/components/zubi/playground/` | modular playground panels for scenarios, market state, route split, protocol timeline, main proof catalog, detailed visual test map, and live activity |
+| `frontend/src/components/zubi/playground/` | modular playground panels for scenarios, market state, route split, protocol timeline, main proof catalog, detailed visual test map, copyable test commands, GitHub proof links, skipped-maker reasons, and live activity |
+| `frontend/public/test-results/latest.json` | deploy-safe latest known proof status artifact for the Playground |
 
 ## Frontend Product Flow
 
@@ -270,7 +271,7 @@ The frontend is not static. It uses the same live systems as the contracts and s
 | `/sell` | asks solver API for fresh route quote, blocks if insufficient liquidity, executes `approve` + `routeExactIn` |
 | `/make` | builds encoded SwapVM strategy via `POST /strategies/build`, then executes `approve(quoteToken -> Aqua)` + `Aqua.ship(...)` |
 | `/portfolio` | reads wallet receipt balances from contracts, maker strategies and routes from The Graph, submits real `issue()` and `redeem()` |
-| `/playground` | deployable judge cockpit with live Graph markets, solver quotes, route split previews, protocol proof timeline, activity tape, main proof catalog, and visual test map for curve, routing, guardrail, receipt, fork, and indexing tests |
+| `/playground` | deployable judge cockpit with live Graph markets, solver quotes, route split previews, skipped-maker reasons, protocol proof timeline, activity tape, main proof catalog, copyable commands, GitHub proof links, latest proof status, and visual test map for curve, routing, guardrail, receipt, fork, and indexing tests |
 
 ## Tests and Proofs
 
