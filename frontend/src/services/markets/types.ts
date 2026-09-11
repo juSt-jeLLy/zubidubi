@@ -145,4 +145,8 @@ export type MarketBoard = {
   protocol: MarketBoardResponse["protocol"];
   markets: LiveMarket[];
   activity: LiveActivity[];
+  /** Live receipt assets from the subgraph (backing token, maturity, assetsPerReceipt). */
+  receiptAssets: GraphReceiptAsset[];
+  /** quoteToken address (lowercased) -> symbol/decimals, used to label backing tokens. */
+  underlyingTokens: Record<string, { symbol: string; decimals: number }>;
 };

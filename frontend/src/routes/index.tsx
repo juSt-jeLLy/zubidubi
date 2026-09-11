@@ -72,6 +72,11 @@ function LandingPage() {
                   Sell a position
                 </Link>
               </Button>
+              <Button asChild variant="outline" className="font-semibold">
+                <a href="/portfolio#acquire">
+                  Get demo assets
+                </a>
+              </Button>
               <Button asChild variant="ghost" className="font-semibold text-muted-foreground">
                 <Link to="/make">
                   Make a strategy

@@ -196,6 +196,14 @@ export function mapMarketBoard(data: MarketBoardResponse): MarketBoard {
     }
   }
 
+  const underlyingTokens: Record<string, { symbol: string; decimals: number }> = {};
+  for (const market of data.markets) {
+    underlyingTokens[market.quoteToken.id.toLowerCase()] = {
+      symbol: market.quoteToken.symbol,
+      decimals: market.quoteToken.decimals,
+    };
+  }
+
   const activity = [
     ...data.routeFills.map(activityFromFill),
     ...data.strategySnapshots
@@ -214,5 +222,7 @@ export function mapMarketBoard(data: MarketBoardResponse): MarketBoard {
       .map((market) => mapMarket(market, receiptsByToken, latestFillByMarket))
       .sort((a, b) => b.strategies - a.strategies || a.symbol.localeCompare(b.symbol)),
     activity,
+    receiptAssets: data.receiptAssets,
+    underlyingTokens,
   };
 }

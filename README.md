@@ -104,6 +104,16 @@ The upgraded subgraph also reconstructs a solver-grade market book:
 - `StrategySnapshot`: strategy state timeline across ship, push, pull, swap, and dock events.
 - `MakerExposure`: maker inventory pressure for routing and risk views.
 
+## Frontend Wallet Flows
+
+The frontend uses the same live paths as the scripts:
+
+- `/markets` reads the Subgraph Studio `v0.9.3` market board.
+- `/sell` asks the solver API for a fresh route preview and executes `approve()` plus `ZubiDubiRouteExecutor.routeExactIn()` from the connected Privy wallet.
+- `/portfolio#acquire` discovers Sepolia receipt assets from The Graph, lets the user select one claim, reads the connected wallet's backing-token balance, previews `ZubiDubiExitReceipt.previewIssue()`, then submits `approve(underlying -> receipt)` and `issue(assets, receiver)` from the connected wallet.
+
+The acquire flow does not mint arbitrary demo tokens. It requires the user to submit the real backing asset for the selected Sepolia receipt: WETH, USDC, or LINK.
+
 ## Substreams Module
 
 ```bash

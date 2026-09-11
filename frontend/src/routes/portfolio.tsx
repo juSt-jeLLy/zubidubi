@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AcquireDemoClaims } from "@/components/zubi/AcquireDemoClaims";
+import { SectionBoundary } from "@/components/zubi/SectionBoundary";
 import { StrategyList } from "@/components/zubi/StrategyList";
 import {
   HOLDINGS,
@@ -112,6 +114,10 @@ function PortfolioPage() {
           icon={<BadgeDollarSign className="size-4" />}
         />
       </dl>
+
+      <SectionBoundary label="acquire-demo-claims">
+        <AcquireDemoClaims />
+      </SectionBoundary>
 
       <Tabs defaultValue="holdings" className="mt-8">
         <TabsList className="h-auto flex-wrap justify-start rounded-md border border-border bg-surface p-1">
