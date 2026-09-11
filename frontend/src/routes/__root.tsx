@@ -11,6 +11,7 @@ import { useEffect, type ReactNode } from "react";
 
 import { Footer, Navbar } from "@/components/zubi/Navbar";
 import { WalletProvider } from "@/lib/wallet";
+import { PrivyAppProvider } from "@/providers/PrivyAppProvider";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
@@ -129,16 +130,18 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <WalletProvider>
-        <div className="min-h-screen bg-background text-foreground">
-          <Navbar />
-          <main>
-            {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-            <Outlet />
-          </main>
-          <Footer />
-        </div>
-      </WalletProvider>
+      <PrivyAppProvider>
+        <WalletProvider>
+          <div className="min-h-screen bg-background text-foreground">
+            <Navbar />
+            <main>
+              {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+              <Outlet />
+            </main>
+            <Footer />
+          </div>
+        </WalletProvider>
+      </PrivyAppProvider>
     </QueryClientProvider>
   );
 }

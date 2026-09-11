@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { AnimatedNumber } from "@/components/zubi/AnimatedNumber";
 import { cn } from "@/lib/utils";
-import { useWallet } from "@/lib/wallet";
+import { useWallet } from "@/services/wallet/context";
 import { MARKETS, fmtNum, fmtUsd, quoteFor, type MakerFill } from "@/lib/zubi-data";
 
 const searchSchema = z.object({ asset: z.string().optional() });
@@ -42,7 +42,8 @@ export const Route = createFileRoute("/sell")({
       { property: "og:title", content: "Sell your maturing position — ZubiDubi" },
       {
         property: "og:description",
-        content: "Transparent per-maker fill breakdown, benchmarked against the Pendle market rate.",
+        content:
+          "Transparent per-maker fill breakdown, benchmarked against the Pendle market rate.",
       },
     ],
   }),
@@ -65,7 +66,10 @@ function StatusBadge({ status }: { status: MakerFill["status"] }) {
         ? "Skipped — exposure cap"
         : "Skipped — oracle";
   return (
-    <Badge className="gap-1 border-border-strong bg-surface-2 text-muted-foreground" variant="outline">
+    <Badge
+      className="gap-1 border-border-strong bg-surface-2 text-muted-foreground"
+      variant="outline"
+    >
       <X className="size-3" /> {label}
     </Badge>
   );
@@ -131,7 +135,9 @@ function SellPage() {
               { l: "Protocol fee", v: fmtUsd(fee, 2) },
             ].map((x) => (
               <div key={x.l} className="bg-surface px-4 py-4">
-                <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">{x.l}</dt>
+                <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">
+                  {x.l}
+                </dt>
                 <dd className="num mt-1.5 text-lg">{x.v}</dd>
               </div>
             ))}
@@ -244,7 +250,9 @@ function SellPage() {
                   <span>
                     {filled.length} of {fills.length} makers contributed
                   </span>
-                  <span className="num">{fmtNum(totalFilled, 0)} {market.symbol} filled</span>
+                  <span className="num">
+                    {fmtNum(totalFilled, 0)} {market.symbol} filled
+                  </span>
                 </div>
               </div>
 
@@ -253,7 +261,9 @@ function SellPage() {
                 className="mt-5 flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-2"
               >
                 <span>Contributing makers</span>
-                <ChevronDown className={cn("size-4 transition-transform", expanded && "rotate-180")} />
+                <ChevronDown
+                  className={cn("size-4 transition-transform", expanded && "rotate-180")}
+                />
               </button>
 
               {expanded && (
@@ -267,7 +277,9 @@ function SellPage() {
                           onClick={() => skipped && setFlipped(isFlipped ? null : f.maker)}
                           className={cn(
                             "flex w-full items-center gap-3 rounded-md border border-border px-3 py-3 text-left text-sm",
-                            skipped ? "bg-surface-2/50 opacity-80 hover:opacity-100" : "bg-surface-2",
+                            skipped
+                              ? "bg-surface-2/50 opacity-80 hover:opacity-100"
+                              : "bg-surface-2",
                           )}
                         >
                           <span className="num w-36 shrink-0 truncate text-foreground">
@@ -276,7 +288,9 @@ function SellPage() {
                           <span className="num hidden w-28 shrink-0 text-muted-foreground sm:block">
                             {skipped ? "—" : `${fmtNum(f.amount, 0)}`}
                           </span>
-                          <span className="num w-16 shrink-0 text-primary">{fmtNum(f.discount)}%</span>
+                          <span className="num w-16 shrink-0 text-primary">
+                            {fmtNum(f.discount)}%
+                          </span>
                           <span className="ml-auto shrink-0">
                             <StatusBadge status={f.status} />
                           </span>
@@ -303,18 +317,25 @@ function SellPage() {
           <StepHeader n={3} title="Benchmark" />
           <div className="mt-4 grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2">
             <div className="bg-surface-2 px-4 py-4">
-              <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Our quote</p>
-              <p className="num mt-1.5 text-2xl font-semibold text-primary">{fmtNum(effDiscount)}%</p>
+              <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
+                Our quote
+              </p>
+              <p className="num mt-1.5 text-2xl font-semibold text-primary">
+                {fmtNum(effDiscount)}%
+              </p>
             </div>
             <div className="bg-surface-2 px-4 py-4">
-              <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Pendle market rate</p>
+              <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
+                Pendle market rate
+              </p>
               <p className="num mt-1.5 text-2xl font-semibold text-muted-foreground">
                 {fmtNum(market.benchmark ?? 0)}%
               </p>
             </div>
           </div>
           <p className="mt-2 text-xs text-success">
-            You save {fmtNum(Math.max(0, (market.benchmark ?? 0) - effDiscount))}% vs. the market rate.
+            You save {fmtNum(Math.max(0, (market.benchmark ?? 0) - effDiscount))}% vs. the market
+            rate.
           </p>
         </section>
       )}
@@ -380,7 +401,11 @@ function Row({ l, v, strong }: { l: string; v: string; strong?: boolean }) {
   return (
     <div className="flex justify-between">
       <span className="text-muted-foreground">{l}</span>
-      <span className={cn("num", strong ? "text-base font-semibold text-primary" : "text-foreground")}>{v}</span>
+      <span
+        className={cn("num", strong ? "text-base font-semibold text-primary" : "text-foreground")}
+      >
+        {v}
+      </span>
     </div>
   );
 }

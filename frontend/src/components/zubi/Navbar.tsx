@@ -3,8 +3,8 @@ import { Activity, BarChart3, FlaskConical, LogOut, Menu, PlusCircle, Wallet2 } 
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { useWallet, truncate } from "@/lib/wallet";
 import { cn } from "@/lib/utils";
+import { truncate, useWallet } from "@/services/wallet/context";
 
 const LINKS = [
   { to: "/markets", label: "Markets", icon: BarChart3 },
@@ -14,7 +14,7 @@ const LINKS = [
 ] as const;
 
 function WalletButton({ full }: { full?: boolean }) {
-  const { address, connect, disconnect, connecting } = useWallet();
+  const { address, connect, disconnect, connecting, network, ready } = useWallet();
 
   if (!address) {
     return (
@@ -32,8 +32,8 @@ function WalletButton({ full }: { full?: boolean }) {
   return (
     <div className={cn("flex items-center gap-2", full && "w-full")}>
       <span className="flex items-center gap-1.5 rounded-md border border-border bg-surface-2 px-2 py-1 text-xs text-muted-foreground">
-        <span className="size-1.5 rounded-full bg-success live-dot" />
-        Sepolia
+        <span className={cn("size-1.5 rounded-full bg-success", ready && "live-dot")} />
+        {network}
       </span>
       <span className="num rounded-md border border-border bg-surface-2 px-2.5 py-1 text-xs text-foreground">
         {truncate(address)}

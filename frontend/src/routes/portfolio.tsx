@@ -25,7 +25,7 @@ import {
   fmtUsd,
 } from "@/lib/zubi-data";
 import { cn } from "@/lib/utils";
-import { useWallet } from "@/lib/wallet";
+import { useWallet } from "@/services/wallet/context";
 
 export const Route = createFileRoute("/portfolio")({
   head: () => ({
@@ -64,11 +64,16 @@ function PortfolioPage() {
           </Badge>
           <h1 className="text-3xl font-semibold">Term liquidity cockpit</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            One place to watch maturing assets, routeable exits, maker exposure and redemption readiness.
+            One place to watch maturing assets, routeable exits, maker exposure and redemption
+            readiness.
           </p>
         </div>
         {!address ? (
-          <Button onClick={connect} disabled={connecting} className="w-full font-semibold sm:w-auto">
+          <Button
+            onClick={connect}
+            disabled={connecting}
+            className="w-full font-semibold sm:w-auto"
+          >
             <WalletCards className="size-4" />
             {connecting ? "Connecting..." : "Connect wallet"}
           </Button>
@@ -77,17 +82,35 @@ function PortfolioPage() {
             <span className="size-2 rounded-full bg-success live-dot" />
             <div>
               <p className="text-xs text-muted-foreground">Connected account</p>
-              <p className="num text-sm">{address.slice(0, 8)}...{address.slice(-6)}</p>
+              <p className="num text-sm">
+                {address.slice(0, 8)}...{address.slice(-6)}
+              </p>
             </div>
           </div>
         )}
       </div>
 
       <dl className="mt-8 grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Exitable value" value={fmtUsd(totalHoldings, 0)} icon={<Coins className="size-4" />} />
-        <Stat label="Maker exposure" value={fmtCompact(exposure)} icon={<LineChart className="size-4" />} />
-        <Stat label="Exposure used" value={`${fmtNum(exposurePct, 1)}%`} icon={<ShieldCheck className="size-4" />} />
-        <Stat label="Fees earned" value={fmtUsd(fees, 2)} icon={<BadgeDollarSign className="size-4" />} />
+        <Stat
+          label="Exitable value"
+          value={fmtUsd(totalHoldings, 0)}
+          icon={<Coins className="size-4" />}
+        />
+        <Stat
+          label="Maker exposure"
+          value={fmtCompact(exposure)}
+          icon={<LineChart className="size-4" />}
+        />
+        <Stat
+          label="Exposure used"
+          value={`${fmtNum(exposurePct, 1)}%`}
+          icon={<ShieldCheck className="size-4" />}
+        />
+        <Stat
+          label="Fees earned"
+          value={fmtUsd(fees, 2)}
+          icon={<BadgeDollarSign className="size-4" />}
+        />
       </dl>
 
       <Tabs defaultValue="holdings" className="mt-8">
@@ -102,11 +125,16 @@ function PortfolioPage() {
           <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
             <section className="panel overflow-hidden">
               <div className="border-b border-border px-5 py-4">
-                <h2 className="text-sm font-semibold uppercase tracking-widest">Exit-ready positions</h2>
+                <h2 className="text-sm font-semibold uppercase tracking-widest">
+                  Exit-ready positions
+                </h2>
               </div>
               <div className="divide-y divide-border">
                 {HOLDINGS.map((h) => (
-                  <div key={h.symbol} className="grid gap-4 px-5 py-4 md:grid-cols-[1fr_130px_150px_120px] md:items-center">
+                  <div
+                    key={h.symbol}
+                    className="grid gap-4 px-5 py-4 md:grid-cols-[1fr_130px_150px_120px] md:items-center"
+                  >
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-semibold">{h.symbol}</span>
@@ -125,7 +153,11 @@ function PortfolioPage() {
                         align="right"
                       />
                       <Button size="icon" variant="outline" asChild>
-                        <Link to="/sell" search={{ asset: h.symbol }} aria-label={`Sell ${h.symbol}`}>
+                        <Link
+                          to="/sell"
+                          search={{ asset: h.symbol }}
+                          aria-label={`Sell ${h.symbol}`}
+                        >
                           <ArrowUpRight className="size-4" />
                         </Link>
                       </Button>
@@ -148,7 +180,8 @@ function PortfolioPage() {
                   Next action
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  PT-zbETH-30D matures next. Redeem to WETH at maturity or route it through the best maker quote.
+                  PT-zbETH-30D matures next. Redeem to WETH at maturity or route it through the best
+                  maker quote.
                 </p>
               </div>
             </section>
@@ -185,7 +218,10 @@ function PortfolioPage() {
             </div>
             <div className="divide-y divide-border">
               {REDEMPTIONS.map((r) => (
-                <div key={r.id} className="grid gap-4 px-5 py-4 md:grid-cols-[120px_1fr_140px_120px] md:items-center">
+                <div
+                  key={r.id}
+                  className="grid gap-4 px-5 py-4 md:grid-cols-[120px_1fr_140px_120px] md:items-center"
+                >
                   <span className="num text-xs text-muted-foreground">{r.id}</span>
                   <div>
                     <p className="font-semibold">{r.asset}</p>
@@ -194,7 +230,11 @@ function PortfolioPage() {
                     </p>
                   </div>
                   <span className="text-sm text-muted-foreground">{r.maturity}</span>
-                  <Button size="sm" variant={r.state === "ready" ? "default" : "outline"} disabled={r.state === "claimed"}>
+                  <Button
+                    size="sm"
+                    variant={r.state === "ready" ? "default" : "outline"}
+                    disabled={r.state === "claimed"}
+                  >
                     {r.state === "ready" ? "Redeem" : r.state === "pending" ? "Track" : "Claimed"}
                   </Button>
                 </div>
@@ -206,11 +246,16 @@ function PortfolioPage() {
         <TabsContent value="history" className="mt-5">
           <section className="panel overflow-hidden">
             <div className="border-b border-border px-5 py-4">
-              <h2 className="text-sm font-semibold uppercase tracking-widest">Recent solver routes</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-widest">
+                Recent solver routes
+              </h2>
             </div>
             <div className="divide-y divide-border">
               {ROUTE_PREVIEWS.map((r) => (
-                <div key={`${r.asset}-${r.amount}`} className="grid gap-4 px-5 py-4 lg:grid-cols-[1fr_150px_130px_130px_160px] lg:items-center">
+                <div
+                  key={`${r.asset}-${r.amount}`}
+                  className="grid gap-4 px-5 py-4 lg:grid-cols-[1fr_150px_130px_130px_160px] lg:items-center"
+                >
                   <div>
                     <p className="font-semibold">{r.asset}</p>
                     <p className="text-xs text-muted-foreground">Best maker {r.bestMaker}</p>
@@ -264,7 +309,15 @@ function StatusBadge({ status }: { status: "active" | "matured" | "redeeming" })
   );
 }
 
-function Metric({ label, value, align = "left" }: { label: string; value: string; align?: "left" | "right" }) {
+function Metric({
+  label,
+  value,
+  align = "left",
+}: {
+  label: string;
+  value: string;
+  align?: "left" | "right";
+}) {
   return (
     <div className={align === "right" ? "text-right" : ""}>
       <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{label}</p>

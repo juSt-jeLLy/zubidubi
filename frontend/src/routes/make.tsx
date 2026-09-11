@@ -25,7 +25,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { StrategyList } from "@/components/zubi/StrategyList";
 import { cn } from "@/lib/utils";
-import { useWallet } from "@/lib/wallet";
+import { useWallet } from "@/services/wallet/context";
 import { MARKETS, curvePoints, fmtNum } from "@/lib/zubi-data";
 
 export const Route = createFileRoute("/make")({
@@ -64,7 +64,9 @@ function Section({
         className="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold uppercase tracking-widest"
       >
         {title}
-        <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", open && "rotate-180")} />
+        <ChevronDown
+          className={cn("size-4 text-muted-foreground transition-transform", open && "rotate-180")}
+        />
       </button>
       {open && <div className="space-y-4 border-t border-border px-4 py-4">{children}</div>}
     </div>
@@ -144,9 +146,33 @@ function MakePage() {
           </Section>
 
           <Section title="Pricing">
-            <SliderRow label="Base discount" value={base} set={setBase} min={0} max={3} step={0.05} suffix="%" />
-            <SliderRow label="Annual rate" value={annualRate} set={setAnnualRate} min={0} max={25} step={0.5} suffix="%" />
-            <SliderRow label="Max discount" value={maxDiscount} set={setMaxDiscount} min={0.5} max={12} step={0.25} suffix="%" />
+            <SliderRow
+              label="Base discount"
+              value={base}
+              set={setBase}
+              min={0}
+              max={3}
+              step={0.05}
+              suffix="%"
+            />
+            <SliderRow
+              label="Annual rate"
+              value={annualRate}
+              set={setAnnualRate}
+              min={0}
+              max={25}
+              step={0.5}
+              suffix="%"
+            />
+            <SliderRow
+              label="Max discount"
+              value={maxDiscount}
+              set={setMaxDiscount}
+              min={0.5}
+              max={12}
+              step={0.25}
+              suffix="%"
+            />
           </Section>
 
           <Section title="Curve shape">
@@ -167,7 +193,15 @@ function MakePage() {
               ))}
             </div>
             {convex && (
-              <SliderRow label="Convexity" value={convexity} set={setConvexity} min={1} max={4} step={0.1} suffix="k" />
+              <SliderRow
+                label="Convexity"
+                value={convexity}
+                set={setConvexity}
+                min={1}
+                max={4}
+                step={0.1}
+                suffix="k"
+              />
             )}
           </Section>
 
@@ -191,8 +225,24 @@ function MakePage() {
           </Section>
 
           <Section title="Maturity window" defaultOpen={false}>
-            <SliderRow label="Min days" value={minDays} set={setMinDays} min={1} max={90} step={1} suffix="d" />
-            <SliderRow label="Max days" value={maxDays} set={setMaxDays} min={30} max={540} step={5} suffix="d" />
+            <SliderRow
+              label="Min days"
+              value={minDays}
+              set={setMinDays}
+              min={1}
+              max={90}
+              step={1}
+              suffix="d"
+            />
+            <SliderRow
+              label="Max days"
+              value={maxDays}
+              set={setMaxDays}
+              min={30}
+              max={540}
+              step={5}
+              suffix="d"
+            />
           </Section>
 
           <Section title="Exposure limits" defaultOpen={false}>
@@ -202,7 +252,11 @@ function MakePage() {
             </div>
             <div>
               <Label className="text-xs text-muted-foreground">Per-taker cap</Label>
-              <Input value={perTaker} onChange={(e) => setPerTaker(e.target.value)} className="num mt-1.5" />
+              <Input
+                value={perTaker}
+                onChange={(e) => setPerTaker(e.target.value)}
+                className="num mt-1.5"
+              />
             </div>
           </Section>
 
@@ -255,13 +309,18 @@ function MakePage() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h2 className="text-lg font-semibold">Discount curve</h2>
-                <p className="text-xs text-muted-foreground">Quoted discount vs. time to maturity</p>
+                <p className="text-xs text-muted-foreground">
+                  Quoted discount vs. time to maturity
+                </p>
               </div>
               <div className="flex gap-2">
                 <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
                   {convex ? `convex k=${fmtNum(convexity, 1)}` : "linear"}
                 </Badge>
-                <Badge variant="outline" className="text-[10px] uppercase tracking-wider text-primary">
+                <Badge
+                  variant="outline"
+                  className="text-[10px] uppercase tracking-wider text-primary"
+                >
                   cap {fmtNum(maxDiscount)}%
                 </Badge>
               </div>
@@ -311,12 +370,17 @@ function MakePage() {
             <dl className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-4">
               {[
                 { l: "At 30d", v: `${fmtNum(data.find((d) => d.days >= 30)?.discount ?? 0)}%` },
-                { l: "At 180d", v: `${fmtNum(data.find((d) => d.days >= 180)?.discount ?? maxDiscount)}%` },
+                {
+                  l: "At 180d",
+                  v: `${fmtNum(data.find((d) => d.days >= 180)?.discount ?? maxDiscount)}%`,
+                },
                 { l: "Window", v: `${minDays}–${maxDays}d` },
                 { l: "Tier", v: tier },
               ].map((x) => (
                 <div key={x.l} className="bg-surface-2 px-3 py-3">
-                  <dt className="text-[10px] uppercase tracking-widest text-muted-foreground">{x.l}</dt>
+                  <dt className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                    {x.l}
+                  </dt>
                   <dd className="num mt-1 text-sm capitalize">{x.v}</dd>
                 </div>
               ))}
@@ -329,7 +393,12 @@ function MakePage() {
                   <p className="text-sm font-semibold text-success">Strategy shipped</p>
                   <p className="num text-xs text-muted-foreground">STR-2149 · tx 0x41ba…9f02</p>
                 </div>
-                <Button variant="outline" size="sm" className="ml-auto" onClick={() => setPhase("idle")}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="ml-auto"
+                  onClick={() => setPhase("idle")}
+                >
                   Ship another
                 </Button>
               </div>
@@ -338,8 +407,16 @@ function MakePage() {
                 {connecting ? "Connecting…" : "Connect wallet to ship"}
               </Button>
             ) : (
-              <Button className="mt-5 w-full font-semibold" onClick={ship} disabled={phase === "shipping"}>
-                {phase === "shipping" ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />}
+              <Button
+                className="mt-5 w-full font-semibold"
+                onClick={ship}
+                disabled={phase === "shipping"}
+              >
+                {phase === "shipping" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Rocket className="size-4" />
+                )}
                 {phase === "shipping" ? "Approving & shipping…" : "Approve & ship strategy"}
               </Button>
             )}
