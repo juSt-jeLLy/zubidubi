@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useMutation } from "@tanstack/react-query";
+import { useWallets } from "@privy-io/react-auth";
 import {
   AlertTriangle,
   ArrowDown,
@@ -9,7 +11,7 @@ import {
   ShieldAlert,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +27,11 @@ import {
 import { AnimatedNumber } from "@/components/zubi/AnimatedNumber";
 import { cn } from "@/lib/utils";
 import { useWallet } from "@/services/wallet/context";
-import { MARKETS, fmtNum, fmtUsd, quoteFor, type MakerFill } from "@/lib/zubi-data";
+import { fmtNum } from "@/lib/zubi-data";
+import { useMarkets } from "@/services/markets/useMarkets";
+import { requestRouteQuote } from "@/services/solver/client";
+import { executeRouteQuote } from "@/services/solver/execute";
+import type { SolverQuote, SolverQuoteError } from "@/services/solver/types";
 
 const searchSchema = z.object({ asset: z.string().optional() });
 
@@ -52,68 +58,164 @@ export const Route = createFileRoute("/sell")({
 
 type Phase = "idle" | "quoting" | "quoted" | "approving" | "confirming" | "success" | "error";
 
-function StatusBadge({ status }: { status: MakerFill["status"] }) {
+type MakerRow = {
+  maker: string;
+  orderHash: string;
+  fillIn: string;
+  amountOut: string;
+  status: "filled" | "skipped";
+};
+
+function StatusBadge({ status }: { status: MakerRow["status"] }) {
   if (status === "filled")
     return (
       <Badge className="gap-1 border-success/40 bg-success/10 text-success" variant="outline">
         <Check className="size-3" /> Filled
       </Badge>
     );
-  const label =
-    status === "skipped-insolvent"
-      ? "Skipped — insolvent"
-      : status === "skipped-exposure"
-        ? "Skipped — exposure cap"
-        : "Skipped — oracle";
   return (
     <Badge
       className="gap-1 border-border-strong bg-surface-2 text-muted-foreground"
       variant="outline"
     >
-      <X className="size-3" /> {label}
+      <X className="size-3" /> Skipped
     </Badge>
   );
+}
+
+function shortAddress(address: string) {
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+function formatToken(value: string | number, symbol: string, decimals = 6) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) return `-- ${symbol}`;
+  return `${new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: decimals,
+  }).format(parsed)} ${symbol}`;
 }
 
 function SellPage() {
   const { asset } = Route.useSearch();
   const { address, connect, connecting } = useWallet();
+  const { wallets } = useWallets();
+  const { data: marketBoard, isLoading: marketsLoading, isError: marketsError } = useMarkets();
+  const markets = useMemo(() => marketBoard?.markets ?? [], [marketBoard?.markets]);
 
-  const [symbol, setSymbol] = useState(asset ?? MARKETS[0]!.symbol);
-  const [amount, setAmount] = useState("50000");
+  const [marketId, setMarketId] = useState<string>("");
+  const [amount, setAmount] = useState("0.003");
   const [phase, setPhase] = useState<Phase>("idle");
   const [expanded, setExpanded] = useState(true);
   const [flipped, setFlipped] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [liquidityErrorQuote, setLiquidityErrorQuote] = useState<SolverQuote | null>(null);
+  const [approvalHash, setApprovalHash] = useState<string | null>(null);
+  const [routeHash, setRouteHash] = useState<string | null>(null);
 
-  const market = MARKETS.find((m) => m.symbol === symbol) ?? MARKETS[0]!;
+  useEffect(() => {
+    if (marketId || markets.length === 0) return;
+    const initial = asset
+      ? markets.find((market) => market.id === asset || market.symbol === asset)
+      : null;
+    setMarketId((initial ?? markets[0])!.id);
+  }, [asset, marketId, markets]);
+
+  const market = markets.find((item) => item.id === marketId) ?? markets[0] ?? null;
+  const quoteMutation = useMutation({
+    mutationFn: async () => {
+      if (!market) throw new Error("Select a live market first.");
+      return requestRouteQuote({
+        tokenIn: market.tokenIn,
+        tokenOut: market.tokenOut,
+        amountIn: amount || "0",
+        inputDecimals: market.receiptDecimals,
+      });
+    },
+    onSuccess: () => {
+      setLiquidityErrorQuote(null);
+      setError(null);
+      setPhase("quoted");
+    },
+    onError: (quoteError: SolverQuoteError) => {
+      setLiquidityErrorQuote(quoteError.quote ?? null);
+      setError(quoteError.message);
+      setPhase(quoteError.code === "insufficient_liquidity" ? "idle" : "error");
+    },
+  });
+  const executeMutation = useMutation({
+    mutationFn: async () => {
+      if (!quote) throw new Error("Get an executable quote first.");
+      if (!quote.execution)
+        throw new Error("This quote cannot be executed because it is not fully filled.");
+      if (!address) throw new Error("Connect your wallet first.");
+      const wallet = wallets.find((item) => item.address.toLowerCase() === address.toLowerCase());
+      if (!wallet) throw new Error("Connected wallet was not found by Privy.");
+
+      setPhase("approving");
+      const result = await executeRouteQuote(wallet, quote, address as `0x${string}`, {
+        onApprovalSubmitted: (hash) => {
+          setApprovalHash(hash);
+          setPhase("confirming");
+        },
+        onRouteSubmitted: (hash) => {
+          setRouteHash(hash);
+          setPhase("confirming");
+        },
+      });
+      return result;
+    },
+    onSuccess: (result) => {
+      setRouteHash(result.routeHash);
+      setError(null);
+      setPhase("success");
+    },
+    onError: (executeError) => {
+      setError(executeError instanceof Error ? executeError.message : String(executeError));
+      setPhase("error");
+    },
+  });
+
   const amt = Number(amount) || 0;
-  const fills = useMemo(() => quoteFor(market, amt), [market, amt]);
-  const filled = fills.filter((f) => f.status === "filled");
-  const totalFilled = filled.reduce((s, f) => s + f.amount, 0);
-  const effDiscount =
-    totalFilled > 0 ? filled.reduce((s, f) => s + f.discount * f.amount, 0) / totalFilled : 0;
-  const gross = totalFilled * (1 - effDiscount / 100);
-  const fee = gross * 0.001;
-  const net = gross - fee;
+  const quote = quoteMutation.data ?? null;
+  const quoteSymbol = market?.quoteSymbol ?? "";
+  const makerRows = useMemo<MakerRow[]>(() => {
+    const fills =
+      quote?.routePreview.fills.map((fill) => ({
+        maker: fill.maker,
+        orderHash: fill.orderHash,
+        fillIn: fill.fillIn,
+        amountOut: fill.estimatedGrossOut,
+        status: "filled" as const,
+      })) ?? [];
+    const skipped =
+      quote?.skippedMakers.map((maker) => ({
+        maker: maker.maker,
+        orderHash: maker.orderHash,
+        fillIn: "0",
+        amountOut: "0",
+        status: "skipped" as const,
+      })) ?? [];
+    return [...fills, ...skipped];
+  }, [quote]);
+  const filled = makerRows.filter((row) => row.status === "filled");
+  const gross = filled.reduce((sum, fill) => sum + Number(fill.amountOut), 0);
+  const net = quote ? Number(quote.quotedNetOut) : 0;
+  const fee = Math.max(0, gross - net);
+  const fillPercent = quote
+    ? (Number(quote.quotedReceiptIn) / Math.max(Number(quote.requestedReceiptIn), 1e-18)) * 100
+    : 0;
 
   const runQuote = () => {
     setError(null);
+    setLiquidityErrorQuote(null);
+    setApprovalHash(null);
+    setRouteHash(null);
     setPhase("quoting");
-    window.setTimeout(() => setPhase("quoted"), 900);
+    quoteMutation.mutate();
   };
 
   const execute = () => {
-    setPhase("approving");
-    window.setTimeout(() => setPhase("confirming"), 900);
-    window.setTimeout(() => {
-      if (amt > 900_000) {
-        setError("execution reverted: ExposureCapExceeded(0x6d3e…b8c2, 2000000)");
-        setPhase("error");
-      } else {
-        setPhase("success");
-      }
-    }, 2200);
+    executeMutation.mutate();
   };
 
   if (phase === "success") {
@@ -125,14 +227,14 @@ function SellPage() {
           </div>
           <h1 className="mt-5 text-2xl font-semibold">Exit settled</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {fmtNum(totalFilled, 0)} {market.symbol} sold across {filled.length} makers.
+            {quote?.quotedReceiptIn} {market?.symbol} sold across {filled.length} makers.
           </p>
 
           <dl className="mt-8 grid gap-px overflow-hidden rounded-lg border border-border bg-border text-left sm:grid-cols-3">
             {[
-              { l: "Net received", v: fmtUsd(net, 2) },
-              { l: "Effective discount", v: `${fmtNum(effDiscount)}%` },
-              { l: "Protocol fee", v: fmtUsd(fee, 2) },
+              { l: "Net received", v: formatToken(net, quoteSymbol) },
+              { l: "Filled", v: `${fmtNum(fillPercent, 2)}%` },
+              { l: "Protocol fee", v: formatToken(fee, quoteSymbol) },
             ].map((x) => (
               <div key={x.l} className="bg-surface px-4 py-4">
                 <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">
@@ -144,10 +246,13 @@ function SellPage() {
           </dl>
 
           <a
-            href="#"
+            href={routeHash ? `https://sepolia.etherscan.io/tx/${routeHash}` : "#"}
+            target="_blank"
+            rel="noreferrer"
             className="num mt-6 inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
           >
-            0x9c1f4ba7…e0d2 <ExternalLink className="size-3" />
+            {routeHash ? shortAddress(routeHash) : "transaction pending"}{" "}
+            <ExternalLink className="size-3" />
           </a>
 
           <div className="mt-8 flex justify-center gap-3">
@@ -172,19 +277,24 @@ function SellPage() {
         <StepHeader n={1} title="Asset & amount" />
         <div className="mt-4 grid gap-3 sm:grid-cols-[200px_1fr]">
           <Select
-            value={symbol}
+            value={marketId}
             onValueChange={(v) => {
-              setSymbol(v);
+              setMarketId(v);
               setPhase("idle");
+              quoteMutation.reset();
+              setLiquidityErrorQuote(null);
+              setApprovalHash(null);
+              setRouteHash(null);
             }}
+            disabled={marketsLoading || markets.length === 0}
           >
             <SelectTrigger className="h-12">
-              <SelectValue />
+              <SelectValue placeholder={marketsLoading ? "Loading markets" : "Select market"} />
             </SelectTrigger>
             <SelectContent>
-              {MARKETS.map((m) => (
-                <SelectItem key={m.symbol} value={m.symbol}>
-                  {m.symbol}
+              {markets.map((m) => (
+                <SelectItem key={m.id} value={m.id}>
+                  {m.symbol} {"->"} {m.quoteSymbol}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -195,6 +305,10 @@ function SellPage() {
             onChange={(e) => {
               setAmount(e.target.value.replace(/[^0-9.]/g, ""));
               setPhase("idle");
+              quoteMutation.reset();
+              setLiquidityErrorQuote(null);
+              setApprovalHash(null);
+              setRouteHash(null);
             }}
             placeholder="0.00"
             className="num h-12 text-lg"
@@ -205,19 +319,46 @@ function SellPage() {
           <ArrowDown className="size-4 text-primary" />
           <span className="text-xs text-muted-foreground">You receive (est.)</span>
           <span className="num ml-auto text-lg font-semibold">
-            <AnimatedNumber value={net} format={(n) => fmtUsd(n, 2)} />
+            <AnimatedNumber value={net} format={(n) => formatToken(n, quoteSymbol)} />
           </span>
         </div>
 
+        {marketsError ? (
+          <div className="mt-4 flex gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-3 text-sm">
+            <AlertTriangle className="size-4 shrink-0 text-destructive" />
+            <p className="text-muted-foreground">
+              Live markets did not load from the subgraph. The sell quote cannot be generated.
+            </p>
+          </div>
+        ) : null}
+
+        {liquidityErrorQuote ? (
+          <div className="mt-4 flex gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-3 text-sm">
+            <ShieldAlert className="size-4 shrink-0 text-warning" />
+            <div>
+              <p className="font-medium text-warning">Not enough maker liquidity</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Requested {liquidityErrorQuote.requestedReceiptIn} {market?.symbol}, but the live
+                route can only fill {liquidityErrorQuote.quotedReceiptIn}. Shortfall:{" "}
+                {liquidityErrorQuote.shortfallReceiptIn}.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
         {phase === "idle" && (
-          <Button className="mt-4 w-full font-semibold" onClick={runQuote} disabled={amt <= 0}>
+          <Button
+            className="mt-4 w-full font-semibold"
+            onClick={runQuote}
+            disabled={amt <= 0 || !market || marketsLoading}
+          >
             Get quote
           </Button>
         )}
       </section>
 
       {/* Step 2 */}
-      {(phase === "quoting" || phase !== "idle") && (
+      {(phase === "quoting" || Boolean(quote)) && (
         <section className="panel mt-4 p-5">
           <StepHeader n={2} title="Quote breakdown" />
           {phase === "quoting" ? (
@@ -226,7 +367,7 @@ function SellPage() {
                 <div key={i} className="h-12 animate-pulse rounded-md bg-surface-2" />
               ))}
               <p className="pt-2 text-center text-xs text-muted-foreground">
-                Polling {market.strategies} maker strategies…
+                Polling {market?.strategies ?? 0} maker strategies…
               </p>
             </div>
           ) : (
@@ -237,8 +378,10 @@ function SellPage() {
                   {filled.map((f, i) => (
                     <div
                       key={f.maker}
-                      title={`${f.ens ?? f.maker} · ${fmtNum((f.amount / totalFilled) * 100, 1)}%`}
-                      style={{ width: `${(f.amount / totalFilled) * 100}%` }}
+                      title={`${shortAddress(f.maker)} · ${fmtNum((Number(f.fillIn) / Number(quote?.quotedReceiptIn ?? 1)) * 100, 1)}%`}
+                      style={{
+                        width: `${(Number(f.fillIn) / Math.max(Number(quote?.quotedReceiptIn ?? 0), 1e-18)) * 100}%`,
+                      }}
                       className={cn(
                         "h-full border-r border-background transition-all duration-500",
                         i % 3 === 0 ? "bg-primary" : i % 3 === 1 ? "bg-chart-2" : "bg-chart-4",
@@ -248,10 +391,10 @@ function SellPage() {
                 </div>
                 <div className="mt-2 flex justify-between text-xs text-muted-foreground">
                   <span>
-                    {filled.length} of {fills.length} makers contributed
+                    {filled.length} of {makerRows.length} makers contributed
                   </span>
                   <span className="num">
-                    {fmtNum(totalFilled, 0)} {market.symbol} filled
+                    {quote?.quotedReceiptIn} {market?.symbol} filled
                   </span>
                 </div>
               </div>
@@ -268,7 +411,7 @@ function SellPage() {
 
               {expanded && (
                 <ul className="mt-3 space-y-2">
-                  {fills.map((f) => {
+                  {makerRows.map((f) => {
                     const skipped = f.status !== "filled";
                     const isFlipped = flipped === f.maker;
                     return (
@@ -283,22 +426,23 @@ function SellPage() {
                           )}
                         >
                           <span className="num w-36 shrink-0 truncate text-foreground">
-                            {f.ens ?? f.maker}
+                            {shortAddress(f.maker)}
                           </span>
                           <span className="num hidden w-28 shrink-0 text-muted-foreground sm:block">
-                            {skipped ? "—" : `${fmtNum(f.amount, 0)}`}
+                            {skipped ? "--" : `${f.fillIn} ${market?.symbol}`}
                           </span>
-                          <span className="num w-16 shrink-0 text-primary">
-                            {fmtNum(f.discount)}%
+                          <span className="num w-28 shrink-0 text-primary">
+                            {skipped ? "--" : formatToken(f.amountOut, quoteSymbol, 4)}
                           </span>
                           <span className="ml-auto shrink-0">
                             <StatusBadge status={f.status} />
                           </span>
                         </button>
-                        {isFlipped && f.reason && (
+                        {isFlipped && skipped && (
                           <p className="flip-in mt-1 flex gap-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-muted-foreground">
                             <ShieldAlert className="size-4 shrink-0 text-warning" />
-                            {f.reason}
+                            This maker was skipped by the solver because the current strategy could
+                            not contribute deliverable output for this route.
                           </p>
                         )}
                       </li>
@@ -312,36 +456,34 @@ function SellPage() {
       )}
 
       {/* Step 3 */}
-      {phase !== "idle" && phase !== "quoting" && market.kind === "real" && (
+      {quote && (
         <section className="panel mt-4 p-5">
-          <StepHeader n={3} title="Benchmark" />
+          <StepHeader n={3} title="Solver decision" />
           <div className="mt-4 grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2">
             <div className="bg-surface-2 px-4 py-4">
               <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
-                Our quote
+                Fill status
               </p>
-              <p className="num mt-1.5 text-2xl font-semibold text-primary">
-                {fmtNum(effDiscount)}%
-              </p>
+              <p className="num mt-1.5 text-2xl font-semibold text-primary">{quote.fillStatus}</p>
             </div>
             <div className="bg-surface-2 px-4 py-4">
               <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
-                Pendle market rate
+                Indexed strategies
               </p>
               <p className="num mt-1.5 text-2xl font-semibold text-muted-foreground">
-                {fmtNum(market.benchmark ?? 0)}%
+                {quote.indexedStrategies}
               </p>
             </div>
           </div>
           <p className="mt-2 text-xs text-success">
-            You save {fmtNum(Math.max(0, (market.benchmark ?? 0) - effDiscount))}% vs. the market
-            rate.
+            Full route available. Execution will still re-check maker wallet balance, allowance,
+            Aqua virtual balances, and oracle guards onchain.
           </p>
         </section>
       )}
 
       {/* Step 4 */}
-      {phase !== "idle" && phase !== "quoting" && (
+      {quote && (
         <section className="panel mt-4 p-5">
           <StepHeader n={4} title="Approve & confirm" />
           {phase === "error" && (
@@ -354,9 +496,11 @@ function SellPage() {
             </div>
           )}
           <div className="mt-4 space-y-2 text-sm">
-            <Row l="Gross proceeds" v={fmtUsd(gross, 2)} />
-            <Row l="Protocol fee (0.10%)" v={`− ${fmtUsd(fee, 2)}`} />
-            <Row l="Net received" v={fmtUsd(net, 2)} strong />
+            <Row l="Gross proceeds" v={formatToken(gross, quoteSymbol)} />
+            <Row l="Protocol fee (0.10%)" v={`- ${formatToken(fee, quoteSymbol)}`} />
+            <Row l="Net received" v={formatToken(net, quoteSymbol)} strong />
+            {approvalHash ? <Row l="Approval tx" v={shortAddress(approvalHash)} /> : null}
+            {routeHash ? <Row l="Route tx" v={shortAddress(routeHash)} /> : null}
           </div>
 
           {!address ? (

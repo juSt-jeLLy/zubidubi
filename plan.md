@@ -56,6 +56,35 @@ The research-backed conclusion:
 
 DeFi already has many assets that are tradable today but redeemable later. Their fair price depends on time, risk, backing value, and liquidity stress. ZubiDubi turns that into an Aqua-native liquidity primitive where makers quote those risks from wallet-held liquidity instead of locking capital into many separate pools.
 
+## Demo economics vs production economics
+
+The Sepolia receipt contracts are demo assets, but they are not meaningless mock tokens. They are real ERC20 contracts backed by real Sepolia WETH, USDC, and LINK, with maturity-gated redemption. The purpose is to make the full lifecycle demonstrable onchain:
+
+1. A user deposits underlying into a receipt contract.
+2. The contract issues a transferable maturing claim.
+3. The user can wait until maturity and redeem 1:1, or sell early through ZubiDubi.
+4. If the user sells early, the seller receives less than par because the maker prices duration, risk, inventory, and liquidity depth.
+5. The maker receives the claim and can redeem later, earning the discount if the asset redeems as expected.
+
+This is deliberately different from saying "users mint a discounted token for free." In the demo, issuance is par-backed so the receipt has a clear economic anchor. The discount is created by the early-exit trade, not by an undercollateralized mint.
+
+In the real version, most sellers do not mint ZubiDubi receipts directly. They arrive with an existing delayed claim:
+
+- A Pendle PT bought below par or received from yield tokenization.
+- A staking/LST/LRT withdrawal receipt.
+- A vault withdrawal share waiting for the next epoch.
+- A bridge withdrawal receipt.
+- Any transferable delayed-redemption claim with known backing and maturity/settlement rules.
+
+This is why ZubiDubi is not "pay full price, wait, get full price." It is a marketplace for when a holder already has a delayed claim and wants liquid assets now, or when a maker wants to underwrite that delay for a priced discount.
+
+Frontend implication: the app can show both sides without inventing fake economics:
+
+- **Acquire / issue demo claim:** on Sepolia, deposit real WETH/USDC/LINK and receive a PT-style receipt so the demo can be tested end to end.
+- **Sell early:** route that receipt through the live solver and show the discount versus maturity/par.
+- **Redeem at maturity:** show that the buyer or holder can redeem 1:1 after maturity.
+- **Production note:** replace Sepolia demo receipts with Pendle PTs, withdrawal receipts, vault claims, or bridge receipts.
+
 ## The combined idea
 
 This project combines two ideas into one larger primitive.
@@ -582,6 +611,9 @@ Completed so far:
 - **Real Sepolia multi-asset term book deployed** (2026-09-11): the public book no longer treats every receipt as ETH-backed. Six PT-style Sepolia receipts are live: `PT-zbETH-30D`, `PT-zbETH-180D` backed by real Sepolia WETH; `PT-zbUSD-30D`, `PT-zbUSD-180D` backed by real Sepolia USDC; and `PT-zbLINK-30D`, `PT-zbLINK-180D` backed by real Sepolia LINK. Pricing uses real Chainlink ETH/USD, USDC/USD, and LINK/USD feeds plus deployed onchain ratio adapters for ETH/USDC, ETH/WETH, USDC/USDC, USDC/WETH, LINK/USDC, and LINK/WETH. No mock token or hardcoded oracle is used in the public Sepolia book.
 - **Seven live Aqua strategies shipped for the real book**: `PT-zbETH-30D/USDC`, `PT-zbETH-180D/USDC`, `PT-zbETH-30D/WETH`, `PT-zbUSD-30D/USDC`, `PT-zbUSD-180D/WETH`, `PT-zbLINK-30D/USDC`, and `PT-zbLINK-180D/WETH`. LINK is used as a real backed receipt asset, but not as a payout token because the deployer has no LINK payout balance; executable payouts are real USDC/WETH.
 - **Subgraph `v0.9.3` deployed and verified**: endpoint `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.3` indexes from the new deployment window, has `_meta.hasIndexingErrors = false`, shows 7 active strategies, 7 markets, and 6 receipt assets with underlying/maturity metadata. The Graph-backed solver now defaults to live `PT-zbETH-30D -> USDC` and quotes `0.003 PT-zbETH-30D` at `7.256156 USDC` net from Graph-discovered strategy data and Sepolia RPC deliverability checks.
+- **Frontend Markets page connected to the live subgraph**: `/markets` now reads Subgraph Studio `v0.9.3` through a modular React Query data layer instead of the old hardcoded `MARKETS`/`ACTIVITY` arrays. Market cards, strategy counts, quote-token liquidity, maturity windows, activity feed, and the displayed block number now come from indexed Sepolia data and refresh every 15 seconds.
+- **Frontend Sell page connected to the live solver API and wallet execution path**: `/sell` now discovers market pairs from the subgraph-backed market hook, lets the seller choose the actual payout market (`receipt -> USDC/WETH`), requests fresh Sepolia `quoteExactIn` route previews from `npm run zubidubi:solver-api`, and blocks the quote flow when the solver reports partial/no fill. The API returns `422 insufficient_liquidity` with requested, available, and shortfall amounts instead of presenting an executable quote when maker liquidity cannot cover the input. Fully executable quotes include the exact route executor, raw amounts, and decoded orders, so the connected Privy wallet submits the real `approve()` plus `ZubiDubiRouteExecutor.routeExactIn()` transaction path.
+- **Demo economics clarified in docs and app copy**: Sepolia receipts are now framed as par-backed PT-style demo claims used to prove the lifecycle onchain, while production assets are real Pendle PTs, withdrawal receipts, vault claims, bridge receipts, or other delayed-redemption positions. The frontend landing page now explains that the discount is earned/paid during early exit, not created by a free undercollateralized mint.
 - Foundry invariant suites added: `test/invariants/AquaExitCurveInvariants.t.sol` (discount >= 0 and < par, amountOut monotonic in time, convex >= linear discount over a warped-time tape) and `test/invariants/ZubiDubiRouteInvariants.t.sol` (maker payouts capped at min(wallet, allowance), route atomicity, fee/recipient value conservation, same-maker multi-strategy dedup).
 - Official Aqua and SwapVM sources are vendored locally, with SwapVM based on the production `release/1.0.2` line and the SDK aligned to the official `swap-vm/v0.4.1` release.
 - Custom `AquaExitTerm` SwapVM instruction is implemented for maturity, oracle, exposure, liquidity, risk-tier, max-discount, max-notional, allowed-asset, and staleness checks.

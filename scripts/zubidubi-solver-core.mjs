@@ -138,6 +138,9 @@ export async function quoteZubiDubiRoute(options = {}) {
   const quoteCandidates = quotes.filter((quote) => quote.fillIn > 0n && !quote.skipped)
   const skippedQuotes = quotes.filter((quote) => quote.skipped)
   const routePreview = buildBestFirstPreview(quoteCandidates, amountIn, receiptDecimals, quoteTokenDecimals)
+  const canExecute = totalIn === amountIn
+  const fillStatus = canExecute ? 'FULL' : totalIn > 0n ? 'PARTIAL' : 'NONE'
+  const shortfallIn = amountIn - totalIn
 
   const formatted = {
     product: 'ZubiDubi self-custodial term-liquidity solver',
@@ -149,8 +152,11 @@ export async function quoteZubiDubiRoute(options = {}) {
     tokenOut,
     market,
     indexedStrategies: strategies.length,
+    canExecute,
+    fillStatus,
     requestedReceiptIn: formatUnits(amountIn, receiptDecimals),
     quotedReceiptIn: formatUnits(totalIn, receiptDecimals),
+    shortfallReceiptIn: formatUnits(shortfallIn, receiptDecimals),
     quotedNetOut: formatUnits(totalOut, quoteTokenDecimals),
     routePreview,
     quoteCandidates: quoteCandidates.map((quote) => ({
@@ -164,6 +170,20 @@ export async function quoteZubiDubiRoute(options = {}) {
       maker: quote.maker,
       orderHash: quote.orderHash,
     })),
+    execution: canExecute ? {
+      routeExecutor: config.deployment.routeExecutor,
+      tokenIn,
+      tokenOut,
+      amountIn: amountIn.toString(),
+      minAmountOut: totalOut.toString(),
+      receiptDecimals,
+      quoteTokenDecimals,
+      orders: orders.map((order) => ({
+        maker: order.maker,
+        traits: order.traits.toString(),
+        data: order.data,
+      })),
+    } : null,
   }
 
   return {

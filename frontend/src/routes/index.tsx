@@ -115,6 +115,39 @@ function LandingPage() {
       </section>
 
       <section className="border-y border-border bg-surface/50">
+        <div className="mx-auto grid max-w-7xl gap-6 px-4 py-14 sm:px-6 lg:grid-cols-[360px_1fr]">
+          <div>
+            <Badge variant="outline" className="mb-4 border-primary/40 text-primary">
+              Demo economics
+            </Badge>
+            <h2 className="text-2xl font-semibold">The discount happens at early exit.</h2>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Sepolia receipts are par-backed so the demo has a real redemption anchor. In production,
+              the seller usually arrives with a Pendle PT, withdrawal receipt, vault claim or bridge
+              claim that already matures later.
+            </p>
+          </div>
+          <div className="grid gap-px overflow-hidden rounded-lg border border-border bg-border md:grid-cols-3">
+            <Step
+              n="A"
+              title="Issue or acquire"
+              text="Demo users deposit real Sepolia WETH, USDC or LINK; production users bring an existing maturing DeFi claim."
+            />
+            <Step
+              n="B"
+              title="Sell before maturity"
+              text="ZubiDubi routes the claim to makers who pay liquid USDC/WETH now at a priced term discount."
+            />
+            <Step
+              n="C"
+              title="Redeem later"
+              text="The maker holds the claim and earns the discount if redemption completes at par after maturity."
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="border-y border-border bg-surface/50">
         <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
           <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>

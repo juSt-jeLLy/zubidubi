@@ -14,6 +14,25 @@ This is an explicit product decision: we model the **general case** of a maturin
 
 So the question "if it's freely tradable, why is your curve the only exit?" has a direct answer: it is not the only exit, and it is not trying to be. It is a price-discovery + instant-liquidity primitive for assets that are tradable but not *instantly redeemable* — liquidity ≠ redemption, and that mismatch is the product.
 
+## Demo Receipt vs Real-World Assets
+
+The public Sepolia assets are PT-style demo receipts backed by real Sepolia WETH, USDC, and LINK. They are not meant to pretend that a user magically creates yield by minting a receipt and redeeming the same amount later. The Sepolia `issue()` path exists so judges can verify a complete onchain lifecycle with real ERC20 transfers:
+
+1. Deposit a real underlying token into the receipt contract.
+2. Receive a transferable maturing claim.
+3. Sell that claim before maturity through ZubiDubi at a risk-adjusted discount.
+4. Let the buyer/maker hold the claim and redeem it at maturity.
+
+In production, the receipt side would normally come from an existing DeFi position rather than from our demo issuer:
+
+- Pendle Principal Tokens bought below par and redeemable at maturity.
+- LST/LRT withdrawal receipts or unstaking claims.
+- Vault withdrawal shares with epoch-based exits.
+- Bridge withdrawal receipts or delayed settlement claims.
+- Any transferable claim where redemption is delayed but the backing asset is known.
+
+That is where the economics become real: the seller accepts less than future redemption value to get liquid USDC/WETH now, while the maker earns the discount for taking duration, liquidity, oracle, depeg, and inventory risk. ZubiDubi is the routing and pricing layer for that early-liquidity trade.
+
 ## Term-Structure Curves
 
 The discount engine is a real term-structure primitive, not a single formula:

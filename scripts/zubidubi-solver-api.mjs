@@ -39,6 +39,13 @@ const server = createServer(async (req, res) => {
       const amountIn = body.amountIn || url.searchParams.get('amountIn') || undefined
       const inputDecimals = body.inputDecimals || url.searchParams.get('inputDecimals') || undefined
       const quote = await quoteZubiDubiRoute({ tokenIn, tokenOut, amountIn, inputDecimals })
+      if (!quote.canExecute) {
+        return send(res, 422, {
+          error: 'insufficient_liquidity',
+          message: `Not enough maker liquidity to fill ${quote.requestedReceiptIn}; available route can fill ${quote.quotedReceiptIn}.`,
+          quote: toPublicQuote(quote),
+        })
+      }
       return send(res, 200, toPublicQuote(quote))
     }
 

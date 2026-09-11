@@ -1,10 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowUpRight, Clock, Layers, Zap } from "lucide-react";
-import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { AnimatedNumber } from "@/components/zubi/AnimatedNumber";
-import { ACTIVITY, MARKETS, fmtCompact, fmtNum } from "@/lib/zubi-data";
+import { fmtNum } from "@/lib/zubi-data";
+import { useMarkets } from "@/services/markets/useMarkets";
 
 export const Route = createFileRoute("/markets")({
   head: () => ({
@@ -18,7 +18,8 @@ export const Route = createFileRoute("/markets")({
       { property: "og:title", content: "Markets - ZubiDubi" },
       {
         property: "og:description",
-        content: "Best maker-quoted discounts, liquidity and active strategy depth for maturing DeFi assets.",
+        content:
+          "Best maker-quoted discounts, liquidity and active strategy depth for maturing DeFi assets.",
       },
     ],
   }),
@@ -26,15 +27,17 @@ export const Route = createFileRoute("/markets")({
 });
 
 function MarketsPage() {
-  const totalLiquidity = MARKETS.reduce((s, m) => s + m.liquidity, 0);
-  const avgDiscount = MARKETS.reduce((s, m) => s + m.bestDiscount, 0) / MARKETS.length;
-
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const id = window.setInterval(() => setTick((t) => t + 1), 3500);
-    return () => window.clearInterval(id);
-  }, []);
-  const jitter = (base: number, pct: number) => base * (1 + Math.sin(tick * 1.7) * pct);
+  const { data, error, isError, isLoading, isFetching } = useMarkets();
+  const markets = data?.markets ?? [];
+  const activity = data?.activity ?? [];
+  const activeStrategies = markets.reduce((sum, market) => sum + market.strategies, 0);
+  const inferredDiscounts = markets
+    .map((market) => market.bestDiscount)
+    .filter((discount): discount is number => discount !== null);
+  const avgDiscount =
+    inferredDiscounts.length > 0
+      ? inferredDiscounts.reduce((sum, discount) => sum + discount, 0) / inferredDiscounts.length
+      : 0;
 
   return (
     <div>
@@ -73,12 +76,30 @@ function MarketsPage() {
 
           <dl className="mt-12 grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-3">
             {[
-              { label: "Open maker liquidity", value: jitter(totalLiquidity, 0.004), fmt: fmtCompact },
-              { label: "Active markets", value: MARKETS.length, fmt: (n: number) => String(Math.round(n)) },
-              { label: "Avg best discount", value: jitter(avgDiscount, 0.02), fmt: (n: number) => `${fmtNum(n)}%` },
+              {
+                label: "Open strategies",
+                value: activeStrategies,
+                fmt: (n: number) => String(Math.round(n)),
+              },
+              {
+                label: "Active markets",
+                value: markets.length,
+                fmt: (n: number) => String(Math.round(n)),
+              },
+              {
+                label: inferredDiscounts.length > 0 ? "Avg live discount" : "Indexed routes",
+                value:
+                  inferredDiscounts.length > 0
+                    ? avgDiscount
+                    : Number(data?.protocol?.cumulativeRouteCount ?? 0),
+                fmt: (n: number) =>
+                  inferredDiscounts.length > 0 ? `${fmtNum(n)}%` : String(Math.round(n)),
+              },
             ].map((s) => (
               <div key={s.label} className="bg-surface px-5 py-5">
-                <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">{s.label}</dt>
+                <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">
+                  {s.label}
+                </dt>
                 <dd className="num mt-2 text-3xl font-semibold text-foreground">
                   <AnimatedNumber value={s.value} format={s.fmt} />
                 </dd>
@@ -92,15 +113,43 @@ function MarketsPage() {
         <div className="mb-6 flex items-end justify-between">
           <div>
             <h2 className="text-2xl font-semibold">Market board</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Best quoted discount per asset, updated per block.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Indexed markets, maker liquidity and routed fills from the live ZubiDubi subgraph.
+            </p>
           </div>
-          <span className="num hidden text-xs text-muted-foreground sm:block">block 7,241,908</span>
+          <span className="num hidden text-xs text-muted-foreground sm:block">
+            {data?.blockNumber
+              ? `subgraph block ${data.blockNumber}`
+              : isFetching
+                ? "refreshing"
+                : "live subgraph"}
+          </span>
         </div>
 
+        {isError ? (
+          <div className="panel border-destructive/40 p-5 text-sm text-muted-foreground">
+            Market data did not load from the subgraph:{" "}
+            {error instanceof Error ? error.message : "unknown error"}
+          </div>
+        ) : null}
+
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {MARKETS.map((m) => (
+          {isLoading
+            ? Array.from({ length: 6 }).map((_, index) => (
+                <div key={index} className="panel h-56 animate-pulse bg-surface" />
+              ))
+            : null}
+
+          {!isLoading && markets.length === 0 && !isError ? (
+            <div className="panel p-5 text-sm text-muted-foreground sm:col-span-2 lg:col-span-3">
+              No active indexed markets yet. Once a strategy is shipped, it will appear here
+              automatically.
+            </div>
+          ) : null}
+
+          {markets.map((m) => (
             <Link
-              key={m.symbol}
+              key={m.id}
               to="/sell"
               search={{ asset: m.symbol }}
               className="group panel p-5 transition-colors hover:border-primary/60"
@@ -119,8 +168,12 @@ function MarketsPage() {
               </div>
 
               <div className="mt-5 flex items-baseline gap-2">
-                <span className="num text-3xl font-semibold text-primary">{fmtNum(m.bestDiscount)}%</span>
-                <span className="text-xs text-muted-foreground">best discount</span>
+                <span className="num text-3xl font-semibold text-primary">
+                  {m.bestDiscount === null ? "--" : `${fmtNum(m.bestDiscount)}%`}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {m.bestDiscount === null ? "awaiting fill signal" : "live discount"}
+                </span>
               </div>
 
               <div className="mt-5 grid grid-cols-3 gap-3 border-t border-border pt-4 text-xs">
@@ -128,13 +181,15 @@ function MarketsPage() {
                   <p className="flex items-center gap-1 text-muted-foreground">
                     <Clock className="size-3" /> Maturity
                   </p>
-                  <p className="num mt-1 text-sm text-foreground">{m.daysToMaturity}d</p>
+                  <p className="num mt-1 text-sm text-foreground">
+                    {m.daysToMaturity === null ? "--" : `${m.daysToMaturity}d`}
+                  </p>
                 </div>
                 <div>
                   <p className="flex items-center gap-1 text-muted-foreground">
                     <Layers className="size-3" /> Liquidity
                   </p>
-                  <p className="num mt-1 text-sm text-foreground">{fmtCompact(m.liquidity)}</p>
+                  <p className="num mt-1 text-sm text-foreground">{m.liquidityLabel}</p>
                 </div>
                 <div>
                   <p className="flex items-center gap-1 text-muted-foreground">
@@ -155,28 +210,44 @@ function MarketsPage() {
               <span className="size-1.5 rounded-full bg-success live-dot" />
               Recent activity
             </h3>
-            <span className="text-xs text-muted-foreground">last 15 minutes</span>
+            <span className="text-xs text-muted-foreground">
+              {isFetching ? "refreshing" : "indexed live"}
+            </span>
           </div>
           <div className="h-64 overflow-hidden">
-            <div className="marquee-y">
-              {[...ACTIVITY, ...ACTIVITY].map((a, i) => (
-                <div key={i} className="flex items-center gap-4 border-b border-border/60 px-5 py-3 text-sm">
-                  <span
-                    className={
-                      a.kind === "fill"
-                        ? "size-1.5 shrink-0 rounded-full bg-primary"
-                        : a.kind === "strategy"
-                          ? "size-1.5 shrink-0 rounded-full bg-success"
-                          : "size-1.5 shrink-0 rounded-full bg-muted-foreground"
-                    }
-                  />
-                  <span className="num w-24 shrink-0 text-xs text-muted-foreground">{a.asset}</span>
-                  <span className="truncate text-muted-foreground">{a.text}</span>
-                  <span className="num ml-auto shrink-0 text-foreground">{a.value}</span>
-                  <span className="num w-10 shrink-0 text-right text-xs text-muted-foreground">{a.ago}</span>
-                </div>
-              ))}
-            </div>
+            {activity.length === 0 ? (
+              <div className="flex h-full items-center justify-center px-5 text-center text-sm text-muted-foreground">
+                No indexed fills or strategy events yet. Activity will stream in from the subgraph
+                after the next route or strategy update.
+              </div>
+            ) : (
+              <div className="marquee-y">
+                {activity.map((a) => (
+                  <div
+                    key={a.id}
+                    className="flex items-center gap-4 border-b border-border/60 px-5 py-3 text-sm"
+                  >
+                    <span
+                      className={
+                        a.kind === "fill"
+                          ? "size-1.5 shrink-0 rounded-full bg-primary"
+                          : a.kind === "strategy"
+                            ? "size-1.5 shrink-0 rounded-full bg-success"
+                            : "size-1.5 shrink-0 rounded-full bg-muted-foreground"
+                      }
+                    />
+                    <span className="num w-24 shrink-0 text-xs text-muted-foreground">
+                      {a.asset}
+                    </span>
+                    <span className="truncate text-muted-foreground">{a.text}</span>
+                    <span className="num ml-auto shrink-0 text-foreground">{a.value}</span>
+                    <span className="num w-10 shrink-0 text-right text-xs text-muted-foreground">
+                      {a.ago}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </section>
