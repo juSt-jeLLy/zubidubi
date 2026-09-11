@@ -52,6 +52,7 @@ export type PlaygroundProofCard = {
   status: "contract" | "fork" | "graph" | "frontend";
   result?: "passed" | "manual" | "requires-rpc";
   lastRun?: string;
+  stats?: { label: string; value: string; tone?: "default" | "good" | "warn" }[];
 };
 
 export type PlaygroundTestCase = {

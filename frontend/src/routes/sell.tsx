@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useWallets } from "@privy-io/react-auth";
 import {
   AlertTriangle,
@@ -14,6 +14,7 @@ import {
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
+import { formatUnits, parseAbi } from "viem";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,8 +36,10 @@ import { buildQuoteBenchmark } from "@/services/solver/benchmarks";
 import { requestRouteQuote } from "@/services/solver/client";
 import { executeRouteQuote } from "@/services/solver/execute";
 import type { SolverQuote, SolverQuoteError } from "@/services/solver/types";
+import { getClaimPublicClient } from "@/services/portfolio/issueClaim";
 
 const searchSchema = z.object({ asset: z.string().optional() });
+const ERC20_BALANCE_ABI = parseAbi(["function balanceOf(address owner) view returns (uint256)"]);
 
 export const Route = createFileRoute("/sell")({
   validateSearch: searchSchema,
@@ -124,6 +127,24 @@ function SellPage() {
   }, [asset, marketId, markets]);
 
   const market = markets.find((item) => item.id === marketId) ?? markets[0] ?? null;
+  const walletBalanceQuery = useQuery({
+    queryKey: ["sell-receipt-balance", address?.toLowerCase() ?? "disconnected", market?.tokenIn],
+    enabled: Boolean(address && market?.tokenIn),
+    queryFn: async () => {
+      const raw = await getClaimPublicClient().readContract({
+        address: market!.tokenIn as `0x${string}`,
+        abi: ERC20_BALANCE_ABI,
+        functionName: "balanceOf",
+        args: [address as `0x${string}`],
+      });
+      return {
+        raw,
+        formatted: formatUnits(raw, market!.receiptDecimals),
+      };
+    },
+    refetchInterval: 15_000,
+    staleTime: 8_000,
+  });
   const quoteMutation = useMutation({
     mutationFn: async () => {
       if (!market) throw new Error("Select a live market first.");
@@ -218,6 +239,21 @@ function SellPage() {
     quoteMutation.mutate();
   };
 
+  const resetQuoteState = () => {
+    setPhase("idle");
+    quoteMutation.reset();
+    setLiquidityErrorQuote(null);
+    setApprovalHash(null);
+    setRouteHash(null);
+  };
+
+  const applyMaxAmount = () => {
+    const maxAmount = liquidityErrorQuote?.quotedReceiptIn ?? walletBalanceQuery.data?.formatted;
+    if (!maxAmount) return;
+    setAmount(maxAmount);
+    resetQuoteState();
+  };
+
   const execute = () => {
     executeMutation.mutate();
   };
@@ -298,11 +334,7 @@ function SellPage() {
                   value={amount}
                   onChange={(e) => {
                     setAmount(e.target.value.replace(/[^0-9.]/g, ""));
-                    setPhase("idle");
-                    quoteMutation.reset();
-                    setLiquidityErrorQuote(null);
-                    setApprovalHash(null);
-                    setRouteHash(null);
+                    resetQuoteState();
                   }}
                   placeholder="0.00"
                   className="num h-16 border-0 bg-transparent px-0 text-3xl shadow-none focus-visible:ring-0"
@@ -335,6 +367,29 @@ function SellPage() {
                 <span>{market?.underlying ?? "Underlying"} backed</span>
                 <span>·</span>
                 <span>{market?.liquidityLabel ?? "No indexed liquidity"}</span>
+                {address ? (
+                  <>
+                    <span>·</span>
+                    <span>
+                      wallet{" "}
+                      <span className="num">
+                        {walletBalanceQuery.isLoading
+                          ? "loading"
+                          : walletBalanceQuery.data
+                            ? `${formatToken(walletBalanceQuery.data.formatted, market?.symbol ?? "", 6)}`
+                            : "--"}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={applyMaxAmount}
+                      disabled={!walletBalanceQuery.data && !liquidityErrorQuote}
+                      className="num rounded border border-border px-1.5 text-primary transition-colors hover:bg-surface disabled:cursor-not-allowed disabled:text-muted-foreground"
+                    >
+                      Max
+                    </button>
+                  </>
+                ) : null}
               </div>
             </div>
 

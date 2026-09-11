@@ -77,6 +77,27 @@ export function ProtocolProofPanel({ activity }: { activity: LiveActivity[] }) {
                 </Badge>
               </div>
               <p className="mt-2 text-xs text-muted-foreground">{proof.whatItProves}</p>
+              {proof.stats?.length ? (
+                <div className="mt-4 grid gap-px overflow-hidden rounded-md border border-border bg-border sm:grid-cols-3">
+                  {proof.stats.map((stat) => (
+                    <div key={stat.label} className="bg-surface-2 px-3 py-3">
+                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                        {stat.label}
+                      </p>
+                      <p
+                        className={[
+                          "num mt-1 break-all text-xs font-semibold",
+                          stat.tone === "good" ? "text-success" : "",
+                          stat.tone === "warn" ? "text-warning" : "",
+                          !stat.tone || stat.tone === "default" ? "text-foreground" : "",
+                        ].join(" ")}
+                      >
+                        {stat.value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               <div className="mt-4 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <a

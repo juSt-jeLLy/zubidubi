@@ -28,6 +28,12 @@ function fmt(value: string | number, digits = 6) {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: digits }).format(parsed);
 }
 
+function isSolverUnavailable(error: string | null) {
+  if (!error) return false;
+  const lower = error.toLowerCase();
+  return lower.includes("failed to fetch") || lower.includes("networkerror") || lower.includes("solver");
+}
+
 export function RouteSplitPreview({
   scenario,
   quote,
@@ -39,6 +45,7 @@ export function RouteSplitPreview({
   const executable = quote?.canExecute ?? false;
   const fillStatus = quote?.fillStatus ?? "NONE";
   const [expandedSkip, setExpandedSkip] = useState<string | null>(null);
+  const solverUnavailable = isSolverUnavailable(error);
 
   return (
     <section className="panel overflow-hidden">
@@ -91,8 +98,15 @@ export function RouteSplitPreview({
             <div className="mt-5 flex gap-3 rounded-md border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
               <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" />
               <div>
-                <p className="font-medium text-warning">Quote blocked</p>
-                <p className="num mt-1 text-xs text-muted-foreground">{error}</p>
+                <p className="font-medium text-warning">
+                  {solverUnavailable ? "Solver API unavailable" : "Quote blocked"}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {solverUnavailable
+                    ? "Start the solver API locally or point VITE_SOLVER_API_URL at a hosted solver endpoint. The page is still reading live Graph data."
+                    : "The route preview was rejected by the solver or contract quote path."}
+                </p>
+                <p className="num mt-1 break-all text-xs text-muted-foreground">{error}</p>
               </div>
             </div>
           ) : null}

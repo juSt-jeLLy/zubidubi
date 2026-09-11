@@ -162,6 +162,21 @@ export const PLAYGROUND_PROOFS: PlaygroundProofCard[] = [
     status: "fork",
     result: "requires-rpc",
     lastRun: "Run with MAINNET_RPC_URL",
+    stats: [
+      {
+        label: "Pendle implied PT rate",
+        value: "0.965766193005277136",
+      },
+      {
+        label: "ZubiDubi vs Pendle",
+        value: "+112 bps",
+        tone: "good",
+      },
+      {
+        label: "Benchmark asset",
+        value: "PT-USD3-17DEC2026",
+      },
+    ],
   },
   {
     id: "graph-book",
