@@ -197,6 +197,31 @@ Benchmark the ZubiDubi routed PT quote against Pendle RouterStatic's own implied
 npm run zubidubi:pendle-benchmark
 ```
 
+This is now a judge-facing demo beat, not only a sanity test. It prints:
+
+- Pendle RouterStatic's live implied `PT-USD3-17DEC2026 -> asset` rate.
+- ZubiDubi's executable fresh-maker `PT-USD3-17DEC2026 -> USDC` routed rate.
+- ZubiDubi's post-inventory routed rate after the maker has already bought PT exposure.
+- The signed bps delta versus Pendle and the inventory penalty versus the fresh quote.
+
+Latest fork run:
+
+```text
+Pendle RouterStatic implied PT -> asset rate: 0.965766193005277136
+ZubiDubi fresh-maker routed PT -> USDC rate: 0.976660800000000000
+ZubiDubi after 200 PT maker inventory rate: 0.963875710000000000
+Fresh ZubiDubi vs Pendle: +112 bps
+Inventory penalty vs fresh ZubiDubi: -131 bps
+```
+
+The punchline is not "ZubiDubi is always cheaper." It is stronger: for the same real maturing PT, ZubiDubi can show a live Pendle market benchmark beside a transparent maker-specific curve, then prove why the quote moves when maker inventory changes.
+
+The Sepolia fork also proves inventory-aware pricing against real Sepolia USDC and the real Chainlink ETH/USD feed:
+
+```bash
+npm run zubidubi:sepolia-inventory-benchmark
+```
+
 For live Sepolia dual-oracle routes, update the deployed Pyth ETH/USD price first:
 
 ```bash

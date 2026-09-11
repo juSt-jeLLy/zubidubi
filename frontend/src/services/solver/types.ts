@@ -33,6 +33,13 @@ export type SolverQuote = {
   quotedReceiptIn: string;
   shortfallReceiptIn: string;
   quotedNetOut: string;
+  benchmark?: {
+    source: "par" | "pendle" | "oracle" | "none";
+    label: string;
+    rate: string | null;
+    deltaBps: number | null;
+    note: string;
+  };
   routePreview: {
     note: string;
     requestedIn: string;

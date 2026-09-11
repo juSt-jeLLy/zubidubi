@@ -132,9 +132,9 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <PrivyAppProvider>
         <WalletProvider>
-          <div className="min-h-screen bg-background text-foreground">
+          <div className="flex min-h-screen flex-col bg-background text-foreground">
             <Navbar />
-            <main>
+            <main className="flex-1">
               {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
               <Outlet />
             </main>

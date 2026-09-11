@@ -11,6 +11,7 @@ import {
   ShieldAlert,
   X,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 
@@ -25,10 +26,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AnimatedNumber } from "@/components/zubi/AnimatedNumber";
+import { QuoteBenchmarkPanel } from "@/components/zubi/QuoteBenchmarkPanel";
 import { cn } from "@/lib/utils";
 import { useWallet } from "@/services/wallet/context";
 import { fmtNum } from "@/lib/zubi-data";
 import { useMarkets } from "@/services/markets/useMarkets";
+import { buildQuoteBenchmark } from "@/services/solver/benchmarks";
 import { requestRouteQuote } from "@/services/solver/client";
 import { executeRouteQuote } from "@/services/solver/execute";
 import type { SolverQuote, SolverQuoteError } from "@/services/solver/types";
@@ -201,6 +204,7 @@ function SellPage() {
   const gross = filled.reduce((sum, fill) => sum + Number(fill.amountOut), 0);
   const net = quote ? Number(quote.quotedNetOut) : 0;
   const fee = Math.max(0, gross - net);
+  const benchmark = useMemo(() => buildQuoteBenchmark(quote, market), [quote, market]);
   const fillPercent = quote
     ? (Number(quote.quotedReceiptIn) / Math.max(Number(quote.requestedReceiptIn), 1e-18)) * 100
     : 0;
@@ -266,266 +270,312 @@ function SellPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <h1 className="text-3xl font-semibold">Sell</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Route your maturing position across live maker strategies.
-      </p>
+    <div className="min-h-[calc(100vh-4rem)] border-b border-border">
+      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:py-14">
+        <div className="mx-auto w-full max-w-[620px]">
+          <Badge variant="outline" className="border-primary/40 text-primary">
+            Live solver
+          </Badge>
+          <h1 className="mt-4 text-3xl font-semibold">Sell a maturing claim</h1>
+          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+            Swap PT-style receipts into liquid maker funds. The solver checks live maker balances,
+            allowances and Aqua state before execution.
+          </p>
 
-      {/* Step 1 */}
-      <section className="panel mt-8 p-5">
-        <StepHeader n={1} title="Asset & amount" />
-        <div className="mt-4 grid gap-3 sm:grid-cols-[200px_1fr]">
-          <Select
-            value={marketId}
-            onValueChange={(v) => {
-              setMarketId(v);
-              setPhase("idle");
-              quoteMutation.reset();
-              setLiquidityErrorQuote(null);
-              setApprovalHash(null);
-              setRouteHash(null);
-            }}
-            disabled={marketsLoading || markets.length === 0}
-          >
-            <SelectTrigger className="h-12">
-              <SelectValue placeholder={marketsLoading ? "Loading markets" : "Select market"} />
-            </SelectTrigger>
-            <SelectContent>
-              {markets.map((m) => (
-                <SelectItem key={m.id} value={m.id}>
-                  {m.symbol} {"->"} {m.quoteSymbol}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Input
-            inputMode="decimal"
-            value={amount}
-            onChange={(e) => {
-              setAmount(e.target.value.replace(/[^0-9.]/g, ""));
-              setPhase("idle");
-              quoteMutation.reset();
-              setLiquidityErrorQuote(null);
-              setApprovalHash(null);
-              setRouteHash(null);
-            }}
-            placeholder="0.00"
-            className="num h-12 text-lg"
-          />
-        </div>
+          <section className="panel mt-7 overflow-hidden p-4 sm:p-5">
+            <div className="rounded-lg border border-border bg-surface-2 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-xs uppercase tracking-widest text-muted-foreground">
+                  You sell
+                </span>
+                <span className="num text-xs text-muted-foreground">
+                  {market?.daysToMaturity ?? "--"}d to maturity
+                </span>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_210px] sm:items-end">
+                <Input
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(e) => {
+                    setAmount(e.target.value.replace(/[^0-9.]/g, ""));
+                    setPhase("idle");
+                    quoteMutation.reset();
+                    setLiquidityErrorQuote(null);
+                    setApprovalHash(null);
+                    setRouteHash(null);
+                  }}
+                  placeholder="0.00"
+                  className="num h-16 border-0 bg-transparent px-0 text-3xl shadow-none focus-visible:ring-0"
+                />
+                <Select
+                  value={marketId}
+                  onValueChange={(v) => {
+                    setMarketId(v);
+                    setPhase("idle");
+                    quoteMutation.reset();
+                    setLiquidityErrorQuote(null);
+                    setApprovalHash(null);
+                    setRouteHash(null);
+                  }}
+                  disabled={marketsLoading || markets.length === 0}
+                >
+                  <SelectTrigger className="h-12 bg-surface">
+                    <SelectValue placeholder={marketsLoading ? "Loading markets" : "Select market"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {markets.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.symbol} / {m.quoteSymbol}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <span>{market?.underlying ?? "Underlying"} backed</span>
+                <span>·</span>
+                <span>{market?.liquidityLabel ?? "No indexed liquidity"}</span>
+              </div>
+            </div>
 
-        <div className="mt-4 flex items-center gap-3 rounded-md border border-border bg-surface-2 px-4 py-3">
-          <ArrowDown className="size-4 text-primary" />
-          <span className="text-xs text-muted-foreground">You receive (est.)</span>
-          <span className="num ml-auto text-lg font-semibold">
-            <AnimatedNumber value={net} format={(n) => formatToken(n, quoteSymbol)} />
-          </span>
-        </div>
+            <div className="relative flex justify-center py-2">
+              <span className="grid size-10 place-items-center rounded-full border border-border bg-background text-primary shadow-[0_0_0_6px_var(--color-surface)]">
+                <ArrowDown className="size-5" />
+              </span>
+            </div>
 
-        {marketsError ? (
-          <div className="mt-4 flex gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-3 text-sm">
-            <AlertTriangle className="size-4 shrink-0 text-destructive" />
-            <p className="text-muted-foreground">
-              Live markets did not load from the subgraph. The sell quote cannot be generated.
-            </p>
-          </div>
-        ) : null}
+            <div className="rounded-lg border border-border bg-surface-2 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-xs uppercase tracking-widest text-muted-foreground">
+                  You receive
+                </span>
+                <span className="text-xs text-muted-foreground">after DAO fee</span>
+              </div>
+              <div className="flex items-end justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="num truncate text-3xl font-semibold">
+                    <AnimatedNumber
+                      value={net}
+                      format={(n) =>
+                        new Intl.NumberFormat("en-US", { maximumFractionDigits: 6 }).format(n)
+                      }
+                    />
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {quote ? `${quote.quotedReceiptIn} ${market?.symbol} filled` : "Quote pending"}
+                  </p>
+                </div>
+                <div className="rounded-md border border-border bg-surface px-4 py-2 text-right">
+                  <p className="text-xs text-muted-foreground">Receive</p>
+                  <p className="text-xl font-semibold">{quoteSymbol || "--"}</p>
+                </div>
+              </div>
+            </div>
 
-        {liquidityErrorQuote ? (
-          <div className="mt-4 flex gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-3 text-sm">
-            <ShieldAlert className="size-4 shrink-0 text-warning" />
-            <div>
-              <p className="font-medium text-warning">Not enough maker liquidity</p>
-              <p className="mt-1 text-xs text-muted-foreground">
+            {marketsError ? (
+              <AlertMessage tone="error">
+                Live markets did not load from the subgraph. The sell quote cannot be generated.
+              </AlertMessage>
+            ) : null}
+
+            {liquidityErrorQuote ? (
+              <AlertMessage tone="warning" title="Not enough maker liquidity">
                 Requested {liquidityErrorQuote.requestedReceiptIn} {market?.symbol}, but the live
                 route can only fill {liquidityErrorQuote.quotedReceiptIn}. Shortfall:{" "}
                 {liquidityErrorQuote.shortfallReceiptIn}.
-              </p>
-            </div>
-          </div>
-        ) : null}
+              </AlertMessage>
+            ) : null}
 
-        {phase === "idle" && (
-          <Button
-            className="mt-4 w-full font-semibold"
-            onClick={runQuote}
-            disabled={amt <= 0 || !market || marketsLoading}
-          >
-            Get quote
-          </Button>
-        )}
-      </section>
+            {phase === "error" ? (
+              <AlertMessage tone="error" title="Transaction reverted">
+                <span className="num break-all">{error}</span>
+              </AlertMessage>
+            ) : null}
 
-      {/* Step 2 */}
-      {(phase === "quoting" || Boolean(quote)) && (
-        <section className="panel mt-4 p-5">
-          <StepHeader n={2} title="Quote breakdown" />
-          {phase === "quoting" ? (
-            <div className="mt-6 space-y-2">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="h-12 animate-pulse rounded-md bg-surface-2" />
-              ))}
-              <p className="pt-2 text-center text-xs text-muted-foreground">
-                Polling {market?.strategies ?? 0} maker strategies…
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* stacked bar */}
-              <div className="mt-4">
-                <div className="flex h-4 w-full overflow-hidden rounded-md border border-border bg-surface-2">
-                  {filled.map((f, i) => (
-                    <div
-                      key={f.maker}
-                      title={`${shortAddress(f.maker)} · ${fmtNum((Number(f.fillIn) / Number(quote?.quotedReceiptIn ?? 1)) * 100, 1)}%`}
-                      style={{
-                        width: `${(Number(f.fillIn) / Math.max(Number(quote?.quotedReceiptIn ?? 0), 1e-18)) * 100}%`,
-                      }}
-                      className={cn(
-                        "h-full border-r border-background transition-all duration-500",
-                        i % 3 === 0 ? "bg-primary" : i % 3 === 1 ? "bg-chart-2" : "bg-chart-4",
-                      )}
-                    />
-                  ))}
-                </div>
-                <div className="mt-2 flex justify-between text-xs text-muted-foreground">
-                  <span>
-                    {filled.length} of {makerRows.length} makers contributed
-                  </span>
-                  <span className="num">
-                    {quote?.quotedReceiptIn} {market?.symbol} filled
-                  </span>
-                </div>
-              </div>
+            <Button
+              className="mt-5 h-12 w-full font-semibold"
+              onClick={quote ? (!address ? connect : execute) : runQuote}
+              disabled={
+                amt <= 0 ||
+                !market ||
+                marketsLoading ||
+                phase === "quoting" ||
+                phase === "approving" ||
+                phase === "confirming" ||
+                connecting
+              }
+            >
+              {phase === "quoting" || phase === "approving" || phase === "confirming" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : null}
+              {!quote
+                ? phase === "quoting"
+                  ? "Finding best route…"
+                  : "Get live quote"
+                : !address
+                  ? connecting
+                    ? "Connecting…"
+                    : "Connect wallet to sell"
+                  : phase === "approving"
+                    ? "Approving spend…"
+                    : phase === "confirming"
+                      ? "Confirming route…"
+                      : phase === "error"
+                        ? "Retry transaction"
+                        : "Approve & sell"}
+            </Button>
+          </section>
 
+          {(phase === "quoting" || Boolean(quote)) && (
+            <section className="panel mt-4 overflow-hidden">
               <button
                 onClick={() => setExpanded((v) => !v)}
-                className="mt-5 flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-sm hover:bg-surface-2"
+                className="flex w-full items-center justify-between px-5 py-4 text-left"
               >
-                <span>Contributing makers</span>
+                <div>
+                  <h2 className="text-sm font-semibold uppercase tracking-widest">
+                    Route preview
+                  </h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {phase === "quoting"
+                      ? `Polling ${market?.strategies ?? 0} maker strategies…`
+                      : `${filled.length} makers fill this route`}
+                  </p>
+                </div>
                 <ChevronDown
                   className={cn("size-4 transition-transform", expanded && "rotate-180")}
                 />
               </button>
 
-              {expanded && (
-                <ul className="mt-3 space-y-2">
-                  {makerRows.map((f) => {
-                    const skipped = f.status !== "filled";
-                    const isFlipped = flipped === f.maker;
-                    return (
-                      <li key={f.maker}>
-                        <button
-                          onClick={() => skipped && setFlipped(isFlipped ? null : f.maker)}
-                          className={cn(
-                            "flex w-full items-center gap-3 rounded-md border border-border px-3 py-3 text-left text-sm",
-                            skipped
-                              ? "bg-surface-2/50 opacity-80 hover:opacity-100"
-                              : "bg-surface-2",
-                          )}
-                        >
-                          <span className="num w-36 shrink-0 truncate text-foreground">
-                            {shortAddress(f.maker)}
-                          </span>
-                          <span className="num hidden w-28 shrink-0 text-muted-foreground sm:block">
-                            {skipped ? "--" : `${f.fillIn} ${market?.symbol}`}
-                          </span>
-                          <span className="num w-28 shrink-0 text-primary">
-                            {skipped ? "--" : formatToken(f.amountOut, quoteSymbol, 4)}
-                          </span>
-                          <span className="ml-auto shrink-0">
-                            <StatusBadge status={f.status} />
-                          </span>
-                        </button>
-                        {isFlipped && skipped && (
-                          <p className="flip-in mt-1 flex gap-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-muted-foreground">
-                            <ShieldAlert className="size-4 shrink-0 text-warning" />
-                            This maker was skipped by the solver because the current strategy could
-                            not contribute deliverable output for this route.
-                          </p>
+              {phase === "quoting" ? (
+                <div className="border-t border-border p-5">
+                  <div className="space-y-2">
+                    {[0, 1, 2].map((i) => (
+                      <div key={i} className="h-12 animate-pulse rounded-md bg-surface-2" />
+                    ))}
+                  </div>
+                </div>
+              ) : expanded ? (
+                <div className="border-t border-border p-5">
+                  <div className="flex h-4 w-full overflow-hidden rounded-md border border-border bg-surface-2">
+                    {filled.map((f, i) => (
+                      <div
+                        key={f.maker}
+                        title={`${shortAddress(f.maker)} · ${fmtNum((Number(f.fillIn) / Number(quote?.quotedReceiptIn ?? 1)) * 100, 1)}%`}
+                        style={{
+                          width: `${(Number(f.fillIn) / Math.max(Number(quote?.quotedReceiptIn ?? 0), 1e-18)) * 100}%`,
+                        }}
+                        className={cn(
+                          "h-full border-r border-background transition-all duration-500",
+                          i % 3 === 0 ? "bg-primary" : i % 3 === 1 ? "bg-chart-2" : "bg-chart-4",
                         )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </>
+                      />
+                    ))}
+                  </div>
+
+                  <ul className="mt-4 space-y-2">
+                    {makerRows.map((f) => {
+                      const skipped = f.status !== "filled";
+                      const isFlipped = flipped === f.maker;
+                      return (
+                        <li key={f.maker}>
+                          <button
+                            onClick={() => skipped && setFlipped(isFlipped ? null : f.maker)}
+                            className={cn(
+                              "flex w-full items-center gap-3 rounded-md border border-border px-3 py-3 text-left text-sm",
+                              skipped
+                                ? "bg-surface-2/50 opacity-80 hover:opacity-100"
+                                : "bg-surface-2",
+                            )}
+                          >
+                            <span className="num w-32 shrink-0 truncate text-foreground">
+                              {shortAddress(f.maker)}
+                            </span>
+                            <span className="num hidden flex-1 text-muted-foreground sm:block">
+                              {skipped ? "--" : `${f.fillIn} ${market?.symbol}`}
+                            </span>
+                            <span className="num shrink-0 text-primary">
+                              {skipped ? "--" : formatToken(f.amountOut, quoteSymbol, 4)}
+                            </span>
+                            <span className="ml-auto shrink-0">
+                              <StatusBadge status={f.status} />
+                            </span>
+                          </button>
+                          {isFlipped && skipped && (
+                            <p className="flip-in mt-1 flex gap-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-muted-foreground">
+                              <ShieldAlert className="size-4 shrink-0 text-warning" />
+                              This maker was skipped because it could not contribute deliverable
+                              output for this route.
+                            </p>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : null}
+            </section>
           )}
-        </section>
-      )}
+        </div>
 
-      {/* Step 3 */}
-      {quote && (
-        <section className="panel mt-4 p-5">
-          <StepHeader n={3} title="Solver decision" />
-          <div className="mt-4 grid gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-2">
-            <div className="bg-surface-2 px-4 py-4">
-              <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
-                Fill status
-              </p>
-              <p className="num mt-1.5 text-2xl font-semibold text-primary">{quote.fillStatus}</p>
-            </div>
-            <div className="bg-surface-2 px-4 py-4">
-              <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
-                Indexed strategies
-              </p>
-              <p className="num mt-1.5 text-2xl font-semibold text-muted-foreground">
-                {quote.indexedStrategies}
-              </p>
-            </div>
-          </div>
-          <p className="mt-2 text-xs text-success">
-            Full route available. Execution will still re-check maker wallet balance, allowance,
-            Aqua virtual balances, and oracle guards onchain.
-          </p>
-        </section>
-      )}
+        <aside className="space-y-4 lg:pt-28">
+          <QuoteBenchmarkPanel benchmark={benchmark} />
 
-      {/* Step 4 */}
-      {quote && (
-        <section className="panel mt-4 p-5">
-          <StepHeader n={4} title="Approve & confirm" />
-          {phase === "error" && (
-            <div className="mt-4 flex gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-3 text-sm">
-              <AlertTriangle className="size-4 shrink-0 text-destructive" />
-              <div>
-                <p className="font-medium text-destructive">Transaction reverted</p>
-                <p className="num mt-1 break-all text-xs text-muted-foreground">{error}</p>
+          <section className="panel p-5">
+            <h2 className="text-sm font-semibold uppercase tracking-widest">Quote health</h2>
+            <div className="mt-4 space-y-3 text-sm">
+              <Row l="Fill status" v={quote?.fillStatus ?? "No quote"} strong={quote?.fillStatus === "FULL"} />
+              <Row l="Indexed strategies" v={quote ? String(quote.indexedStrategies) : String(market?.strategies ?? 0)} />
+              <Row l="Gross proceeds" v={formatToken(gross, quoteSymbol)} />
+              <Row l="DAO fee (0.10%)" v={`- ${formatToken(fee, quoteSymbol)}`} />
+              <Row l="Net received" v={formatToken(net, quoteSymbol)} strong />
+            </div>
+            {quote ? (
+              <p className="mt-4 rounded-md border border-success/30 bg-success/10 px-3 py-2 text-xs text-muted-foreground">
+                Execution re-checks maker wallet balance, allowance, Aqua virtual balances and
+                oracle guards onchain.
+              </p>
+            ) : (
+              <p className="mt-4 rounded-md border border-border bg-surface-2 px-3 py-2 text-xs text-muted-foreground">
+                Get a quote to see maker split, DAO fee and route status.
+              </p>
+            )}
+          </section>
+
+          <section className="panel p-5">
+            <h2 className="text-sm font-semibold uppercase tracking-widest">Settlement path</h2>
+            <div className="mt-4 space-y-3 text-sm text-muted-foreground">
+              <PathRow n="1" text="Approve the maturing claim token." active={Boolean(quote)} />
+              <PathRow n="2" text="Route executor fills across maker strategies." active={phase === "confirming" || phase === "success"} />
+              <PathRow n="3" text="Aqua pulls maker liquidity atomically." active={phase === "success"} />
+            </div>
+            {(approvalHash || routeHash) && (
+              <div className="mt-4 space-y-2 text-xs">
+                {approvalHash ? (
+                  <a
+                    href={`https://sepolia.etherscan.io/tx/${approvalHash}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="num flex items-center gap-1 text-primary hover:underline"
+                  >
+                    Approval {shortAddress(approvalHash)} <ExternalLink className="size-3" />
+                  </a>
+                ) : null}
+                {routeHash ? (
+                  <a
+                    href={`https://sepolia.etherscan.io/tx/${routeHash}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="num flex items-center gap-1 text-primary hover:underline"
+                  >
+                    Route {shortAddress(routeHash)} <ExternalLink className="size-3" />
+                  </a>
+                ) : null}
               </div>
-            </div>
-          )}
-          <div className="mt-4 space-y-2 text-sm">
-            <Row l="Gross proceeds" v={formatToken(gross, quoteSymbol)} />
-            <Row l="Protocol fee (0.10%)" v={`- ${formatToken(fee, quoteSymbol)}`} />
-            <Row l="Net received" v={formatToken(net, quoteSymbol)} strong />
-            {approvalHash ? <Row l="Approval tx" v={shortAddress(approvalHash)} /> : null}
-            {routeHash ? <Row l="Route tx" v={shortAddress(routeHash)} /> : null}
-          </div>
-
-          {!address ? (
-            <Button className="mt-5 w-full font-semibold" onClick={connect} disabled={connecting}>
-              {connecting ? "Connecting…" : "Connect wallet to continue"}
-            </Button>
-          ) : (
-            <Button
-              className="mt-5 w-full font-semibold"
-              onClick={execute}
-              disabled={phase === "approving" || phase === "confirming"}
-            >
-              {phase === "approving" && <Loader2 className="size-4 animate-spin" />}
-              {phase === "confirming" && <Loader2 className="size-4 animate-spin" />}
-              {phase === "approving"
-                ? "Approving spend…"
-                : phase === "confirming"
-                  ? "Confirming route…"
-                  : phase === "error"
-                    ? "Retry"
-                    : "Approve & sell"}
-            </Button>
-          )}
-        </section>
-      )}
+            )}
+          </section>
+        </aside>
+      </div>
     </div>
   );
 }
@@ -537,6 +587,58 @@ function StepHeader({ n, title }: { n: number; title: string }) {
         {n}
       </span>
       <h2 className="text-sm font-semibold uppercase tracking-widest">{title}</h2>
+    </div>
+  );
+}
+
+function AlertMessage({
+  tone,
+  title,
+  children,
+}: {
+  tone: "warning" | "error";
+  title?: string;
+  children: ReactNode;
+}) {
+  const isWarning = tone === "warning";
+  return (
+    <div
+      className={cn(
+        "mt-4 flex gap-2 rounded-md border px-3 py-3 text-sm",
+        isWarning
+          ? "border-warning/40 bg-warning/10"
+          : "border-destructive/40 bg-destructive/10",
+      )}
+    >
+      {isWarning ? (
+        <ShieldAlert className="size-4 shrink-0 text-warning" />
+      ) : (
+        <AlertTriangle className="size-4 shrink-0 text-destructive" />
+      )}
+      <div>
+        {title ? (
+          <p className={cn("font-medium", isWarning ? "text-warning" : "text-destructive")}>
+            {title}
+          </p>
+        ) : null}
+        <p className="mt-1 text-xs text-muted-foreground">{children}</p>
+      </div>
+    </div>
+  );
+}
+
+function PathRow({ n, text, active }: { n: string; text: string; active: boolean }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span
+        className={cn(
+          "num grid size-6 shrink-0 place-items-center rounded-md border text-xs",
+          active ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-surface-2",
+        )}
+      >
+        {n}
+      </span>
+      <span className={active ? "text-foreground" : ""}>{text}</span>
     </div>
   );
 }

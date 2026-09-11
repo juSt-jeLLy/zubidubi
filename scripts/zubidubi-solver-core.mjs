@@ -1,7 +1,16 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createPublicClient, decodeAbiParameters, formatUnits, http, parseAbi, parseUnits } from 'viem'
+import {
+  createPublicClient,
+  decodeAbiParameters,
+  encodeAbiParameters,
+  encodePacked,
+  formatUnits,
+  http,
+  parseAbi,
+  parseUnits,
+} from 'viem'
 import { sepolia } from 'viem/chains'
 
 export const DEFAULT_SUBGRAPH_ENDPOINT = 'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.3'
@@ -10,6 +19,16 @@ export const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..
 const QUOTE_ABI = parseAbi([
   'function quoteExactIn((address maker,uint256 traits,bytes data)[] orders,address tokenIn,address tokenOut,uint256 amountIn) view returns (uint256 totalIn,uint256 totalOut,(bytes32 orderHash,address maker,uint256 fillIn,uint256 amountOut,uint256 deliverableOut,bool skipped)[] quotes)',
 ])
+
+const ROUTER_ABI = parseAbi([
+  'function hash((address maker,uint256 traits,bytes data) order) view returns (bytes32)',
+])
+
+const USE_AQUA_INSTEAD_OF_SIGNATURE_BIT = 1n << 254n
+const OP_AQUA_EXIT_BACKING_ORACLE_CHECK = 0x24
+const OP_AQUA_EXIT_EXPOSURE_CAP = 0x25
+const OP_AQUA_EXIT_DISCOUNT_CURVE_1D = 0x26
+const MAX_UINT128 = (1n << 128n) - 1n
 
 const SOLVER_QUERY = `query SolverStrategies($tokenIn: String!, $tokenOut: String!) {
   markets(where: { receiptToken: $tokenIn, quoteToken: $tokenOut }) {
@@ -141,6 +160,9 @@ export async function quoteZubiDubiRoute(options = {}) {
   const canExecute = totalIn === amountIn
   const fillStatus = canExecute ? 'FULL' : totalIn > 0n ? 'PARTIAL' : 'NONE'
   const shortfallIn = amountIn - totalIn
+  const netRate = totalIn > 0n
+    ? Number(formatUnits(totalOut, quoteTokenDecimals)) / Number(formatUnits(totalIn, receiptDecimals))
+    : 0
 
   const formatted = {
     product: 'ZubiDubi self-custodial term-liquidity solver',
@@ -158,6 +180,13 @@ export async function quoteZubiDubiRoute(options = {}) {
     quotedReceiptIn: formatUnits(totalIn, receiptDecimals),
     shortfallReceiptIn: formatUnits(shortfallIn, receiptDecimals),
     quotedNetOut: formatUnits(totalOut, quoteTokenDecimals),
+    benchmark: {
+      source: 'oracle',
+      label: 'SwapVM oracle/inventory curve',
+      rate: totalIn > 0n ? String(netRate) : null,
+      deltaBps: null,
+      note: 'Sepolia quotes are executable onchain routes. Pendle side-by-side is available through npm run zubidubi:pendle-benchmark on a mainnet fork.',
+    },
     routePreview,
     quoteCandidates: quoteCandidates.map((quote) => ({
       maker: quote.maker,
@@ -207,6 +236,185 @@ export async function listZubiDubiMarkets(options = {}) {
     thesis: 'Aqua makers share wallet-held liquidity across a term book of maturing PT-style assets.',
     graphEndpoint: options.endpoint || config.endpoint,
     ...graphData,
+  }
+}
+
+export async function buildMakerStrategy(options = {}) {
+  const config = loadSolverConfig(options.root || DEFAULT_ROOT)
+  const marketConfig = config.markets.sepolia
+  const maker = requiredAddress(options.maker, 'maker')
+  const tokenIn = normalize(options.tokenIn || config.defaultTokenIn)
+  const tokenOut = normalize(options.tokenOut || config.defaultTokenOut)
+  const receipt = findByAddress(marketConfig.maturingAssets, tokenIn)
+  const quote = findByAddress(marketConfig.quoteAssets, tokenOut)
+  if (!receipt) throw new Error(`Unsupported receipt token for maker strategy: ${tokenIn}`)
+  if (!quote) throw new Error(`Unsupported quote token for maker strategy: ${tokenOut}`)
+
+  const oracle = options.oracleAddress
+    ? {
+        address: requiredAddress(options.oracleAddress, 'oracleAddress'),
+        decimals: Number(options.oracleDecimals || 18),
+        symbol: options.oracleSymbol || 'custom',
+      }
+    : findRatioOracle(marketConfig, receipt.underlyingSymbol, quote.symbol)
+
+  const quoteLiquidityRaw = parsePositiveUnits(
+    options.quoteLiquidity || options.amount || '25',
+    quote.decimals,
+    'quoteLiquidity',
+  )
+  const maxExposureRaw = parsePositiveUnits(
+    options.maxExposure || defaultExposureFor(receipt),
+    receipt.decimals,
+    'maxExposure',
+  )
+  const maxNotionalOutRaw = options.maxNotionalOut
+    ? parsePositiveUnits(options.maxNotionalOut, quote.decimals, 'maxNotionalOut')
+    : 0n
+
+  assertUint128(quoteLiquidityRaw, 'quoteLiquidity')
+  assertUint128(maxExposureRaw, 'maxExposure')
+  assertUint128(maxNotionalOutRaw, 'maxNotionalOut')
+
+  const now = Math.floor(Date.now() / 1000)
+  const maturity = Number(options.maturity || receipt.maturity)
+  const minMaturity = Number(options.minMaturity || now + Number(options.minDays || 1) * 86_400)
+  const maxMaturity = Number(options.maxMaturity || now + Number(options.maxDays || 540) * 86_400)
+  if (maturity < minMaturity || maturity > maxMaturity) {
+    throw new Error(
+      `${receipt.symbol} maturity is outside the selected maker window (${minMaturity}..${maxMaturity}).`,
+    )
+  }
+
+  const args = encodePacked(
+    [
+      'uint32',
+      'uint32',
+      'uint32',
+      'uint40',
+      'uint32',
+      'uint8',
+      'uint8',
+      'uint8',
+      'address',
+      'uint128',
+      'uint32',
+      'uint128',
+      'uint32',
+      'uint32',
+      'uint40',
+      'uint40',
+      'address',
+      'address',
+      'address',
+      'uint32',
+      'uint32',
+      'uint8',
+      'uint32',
+    ],
+    [
+      toBps(options.baseDiscountBps ?? percentToBps(options.baseDiscountPct ?? 0.4), 'baseDiscountBps'),
+      toBps(options.annualRateBps ?? percentToBps(options.annualRatePct ?? 6), 'annualRateBps'),
+      toBps(options.maxDiscountBps ?? percentToBps(options.maxDiscountPct ?? 4), 'maxDiscountBps'),
+      BigInt(maturity),
+      toUint(options.maxStaleness ?? 172_800, 'maxStaleness'),
+      Number(receipt.decimals),
+      Number(quote.decimals),
+      Number(oracle.decimals),
+      oracle.address,
+      maxExposureRaw,
+      toBps(options.inventorySlopeBps ?? percentToBps(options.inventorySlopePct ?? 1.5), 'inventorySlopeBps'),
+      maxNotionalOutRaw,
+      toBps(options.liquiditySlopeBps ?? percentToBps(options.liquiditySlopePct ?? 0.6), 'liquiditySlopeBps'),
+      toBps(options.riskTierBps ?? riskTierBps(options.riskTier || options.tier || 'balanced'), 'riskTierBps'),
+      BigInt(minMaturity),
+      BigInt(maxMaturity),
+      tokenIn,
+      tokenOut,
+      options.secondaryOracleAddress ? requiredAddress(options.secondaryOracleAddress, 'secondaryOracleAddress') : '0x0000000000000000000000000000000000000000',
+      toBps(options.maxDeviationBps ?? percentToBps(options.deviationPct ?? 0), 'maxDeviationBps'),
+      toBps(options.deviationHaircutBps ?? percentToBps(options.deviationHaircutPct ?? 0), 'deviationHaircutBps'),
+      Number(options.curveFamily ?? (options.convex === false ? 0 : 1)),
+      toBps(options.convexityBps ?? percentToBps(Number(options.convexity ?? 1.8)), 'convexityBps'),
+    ],
+  )
+
+  const argLength = (args.length - 2) / 2
+  if (argLength > 255) throw new Error(`Strategy arg payload is too large for uint8 length: ${argLength}`)
+
+  const len = argLength.toString(16).padStart(2, '0')
+  const program = concatHex([
+    `0x${OP_AQUA_EXIT_BACKING_ORACLE_CHECK.toString(16).padStart(2, '0')}${len}`,
+    args,
+    `0x${OP_AQUA_EXIT_EXPOSURE_CAP.toString(16).padStart(2, '0')}${len}`,
+    args,
+    `0x${OP_AQUA_EXIT_DISCOUNT_CURVE_1D.toString(16).padStart(2, '0')}${len}`,
+    args,
+  ])
+
+  const order = {
+    maker,
+    traits: USE_AQUA_INSTEAD_OF_SIGNATURE_BIT,
+    data: program,
+  }
+  const encodedOrder = encodeAbiParameters([
+    {
+      type: 'tuple',
+      components: [
+        { name: 'maker', type: 'address' },
+        { name: 'traits', type: 'uint256' },
+        { name: 'data', type: 'bytes' },
+      ],
+    },
+  ], [order])
+
+  let orderHash = null
+  if (config.rpcUrl) {
+    const client = createPublicClient({ chain: sepolia, transport: http(config.rpcUrl) })
+    orderHash = await client.readContract({
+      address: marketConfig.core.aquaSwapVMRouter,
+      abi: ROUTER_ABI,
+      functionName: 'hash',
+      args: [order],
+    })
+  }
+
+  return {
+    product: 'ZubiDubi maker strategy builder',
+    source: 'config/zubidubi-markets.json + SwapVM modular opcodes',
+    chainId: marketConfig.chainId,
+    core: {
+      aqua: marketConfig.core.aqua,
+      router: marketConfig.core.aquaSwapVMRouter,
+      routeExecutor: marketConfig.core.routeExecutor,
+    },
+    orderHash,
+    order: {
+      maker,
+      traits: order.traits.toString(),
+      data: order.data,
+    },
+    encodedOrder,
+    tokens: [tokenIn, tokenOut],
+    amounts: ['0', quoteLiquidityRaw.toString()],
+    market: {
+      pair: `${receipt.symbol}/${quote.symbol}`,
+      receiptSymbol: receipt.symbol,
+      quoteSymbol: quote.symbol,
+      receiptDecimals: receipt.decimals,
+      quoteDecimals: quote.decimals,
+      maturity,
+      oracle: {
+        symbol: oracle.symbol,
+        address: oracle.address,
+        decimals: oracle.decimals,
+      },
+    },
+    limits: {
+      quoteLiquidity: formatUnits(quoteLiquidityRaw, quote.decimals),
+      maxExposure: formatUnits(maxExposureRaw, receipt.decimals),
+      maxNotionalOut: maxNotionalOutRaw === 0n ? 'unbounded' : formatUnits(maxNotionalOutRaw, quote.decimals),
+    },
   }
 }
 
@@ -277,6 +485,67 @@ export function buildBestFirstPreview(candidates, requestedIn, receiptDecimals, 
 
 export function normalize(address) {
   return address.toLowerCase()
+}
+
+function requiredAddress(value, label) {
+  if (typeof value !== 'string' || !/^0x[0-9a-fA-F]{40}$/u.test(value)) {
+    throw new Error(`Invalid ${label} address.`)
+  }
+  return value
+}
+
+function findByAddress(items, address) {
+  const normalized = normalize(address)
+  return items.find((item) => normalize(item.address) === normalized) || null
+}
+
+function findRatioOracle(marketConfig, underlyingSymbol, quoteSymbol) {
+  const base = underlyingSymbol === 'WETH' ? 'ETH' : underlyingSymbol
+  const symbol = `${base}/${quoteSymbol}`
+  const oracle = marketConfig.oracles.ratioAdapters.find((item) => item.symbol === symbol)
+  if (!oracle) throw new Error(`No deployed Sepolia ratio oracle configured for ${symbol}.`)
+  return oracle
+}
+
+function defaultExposureFor(receipt) {
+  const symbol = receipt.symbol.toUpperCase()
+  if (symbol.includes('USD')) return '50000'
+  if (symbol.includes('LINK')) return '2500'
+  return '10'
+}
+
+function parsePositiveUnits(value, decimals, label) {
+  const parsed = parseUnits(String(value), Number(decimals))
+  if (parsed <= 0n) throw new Error(`${label} must be greater than zero.`)
+  return parsed
+}
+
+function assertUint128(value, label) {
+  if (value < 0n || value > MAX_UINT128) throw new Error(`${label} exceeds uint128.`)
+}
+
+function percentToBps(value) {
+  return Math.round(Number(value) * 100)
+}
+
+function toBps(value, label) {
+  return toUint(value, label)
+}
+
+function toUint(value, label) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed < 0) throw new Error(`${label} must be a positive number.`)
+  return Math.round(parsed)
+}
+
+function riskTierBps(tier) {
+  if (tier === 'conservative') return 25
+  if (tier === 'aggressive') return 150
+  return 75
+}
+
+function concatHex(parts) {
+  return `0x${parts.map((part) => part.replace(/^0x/u, '')).join('')}`
 }
 
 export function loadEnv(path) {

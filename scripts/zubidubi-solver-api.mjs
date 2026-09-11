@@ -1,5 +1,10 @@
 import { createServer } from 'node:http'
-import { listZubiDubiMarkets, quoteZubiDubiRoute, toPublicQuote } from './zubidubi-solver-core.mjs'
+import {
+  buildMakerStrategy,
+  listZubiDubiMarkets,
+  quoteZubiDubiRoute,
+  toPublicQuote,
+} from './zubidubi-solver-core.mjs'
 
 const port = Number(process.env.PORT || process.env.ZUBIDUBI_SOLVER_PORT || 8787)
 
@@ -49,6 +54,11 @@ const server = createServer(async (req, res) => {
       return send(res, 200, toPublicQuote(quote))
     }
 
+    if (url.pathname === '/strategies/build' && req.method === 'POST') {
+      const body = await readJson(req)
+      return send(res, 200, await buildMakerStrategy(body))
+    }
+
     return send(res, 404, {
       error: 'not_found',
       routes: [
@@ -57,6 +67,7 @@ const server = createServer(async (req, res) => {
         'GET /markets',
         'GET /quote?tokenIn=0x...&amountIn=0.003',
         'POST /quote {"tokenIn":"0x...","amountIn":"0.003"}',
+        'POST /strategies/build {"maker":"0x...","tokenIn":"0x...","tokenOut":"0x...","quoteLiquidity":"25"}',
       ],
     })
   } catch (error) {
@@ -66,7 +77,7 @@ const server = createServer(async (req, res) => {
 
 server.listen(port, () => {
   console.log(`ZubiDubi solver API listening on http://localhost:${port}`)
-  console.log('Routes: GET /health | GET /pitch | GET /markets | GET /quote?amountIn=0.003')
+  console.log('Routes: GET /health | GET /pitch | GET /markets | GET /quote?amountIn=0.003 | POST /strategies/build')
 })
 
 function send(res, status, body) {

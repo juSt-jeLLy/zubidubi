@@ -32,6 +32,8 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
     MockTaker public taker;
     IERC20 public usdc;
 
+    uint256 private constant INVENTORY_DEMO_MAX_EXPOSURE = 0.0008 ether;
+
     constructor() AquaOpcodesDebug(address(0)) { }
 
     function setUp() public {
@@ -43,13 +45,7 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
         require(block.chainid == SEPOLIA_CHAIN_ID, "Wrong fork");
 
         aqua = new Aqua();
-        swapVM = new AquaSwapVMRouter(
-            address(aqua),
-            SEPOLIA_WETH,
-            address(this),
-            "ZubiDubiAquaSwapVMRouter",
-            "1.0.0"
-        );
+        swapVM = new AquaSwapVMRouter(address(aqua), SEPOLIA_WETH, address(this), "ZubiDubiAquaSwapVMRouter", "1.0.0");
         exitReceipt = new ZubiDubiExitReceipt(
             address(this),
             IERC20(SEPOLIA_WETH),
@@ -94,11 +90,7 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
         assertGe(_deliverableUsdc(orderA), makerQuote);
 
         (, uint256 amountOut) = taker.swap(
-            orderA,
-            address(exitReceipt),
-            SEPOLIA_USDC,
-            0.001 ether,
-            abi.encodePacked(_takerData(address(taker), true))
+            orderA, address(exitReceipt), SEPOLIA_USDC, 0.001 ether, abi.encodePacked(_takerData(address(taker), true))
         );
 
         assertEq(amountOut, makerQuote);
@@ -106,20 +98,10 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
         assertEq(usdc.balanceOf(address(taker)), amountOut);
         assertEq(exitReceipt.balanceOf(makerA), 0.001 ether);
 
-        (, uint256 unavailableUsdcBalance) = aqua.safeBalances(
-            unavailableMaker,
-            address(swapVM),
-            unavailableHash,
-            address(exitReceipt),
-            SEPOLIA_USDC
-        );
-        (, uint256 makerUsdcBalance) = aqua.safeBalances(
-            makerA,
-            address(swapVM),
-            orderHashA,
-            address(exitReceipt),
-            SEPOLIA_USDC
-        );
+        (, uint256 unavailableUsdcBalance) =
+            aqua.safeBalances(unavailableMaker, address(swapVM), unavailableHash, address(exitReceipt), SEPOLIA_USDC);
+        (, uint256 makerUsdcBalance) =
+            aqua.safeBalances(makerA, address(swapVM), orderHashA, address(exitReceipt), SEPOLIA_USDC);
 
         assertEq(unavailableUsdcBalance, 100e6);
         assertEq(makerUsdcBalance, 100e6 - amountOut);
@@ -139,7 +121,9 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
         // against the real Chainlink ETH/USD feed and real Sepolia USDC.
         ISwapVM.Order memory orderA = _createExitOrder(
             makerA,
-            _buildRealSepoliaExitArgs(100, 1200, 500, uint40(block.timestamp + 30 days), 2 days, 0.0008 ether, 150),
+            _buildRealSepoliaExitArgs(
+                100, 1200, 500, uint40(block.timestamp + 30 days), 2 days, uint128(INVENTORY_DEMO_MAX_EXPOSURE), 150
+            ),
             bytes32("inventory-sepolia")
         );
 
@@ -155,11 +139,7 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
         // Execute a 0.0005 zbETH fill so the maker now holds receipt inventory.
         exitReceipt.mint(address(taker), 0.0005 ether);
         (, uint256 firstFillOut) = taker.swap(
-            orderA,
-            address(exitReceipt),
-            SEPOLIA_USDC,
-            0.0005 ether,
-            abi.encodePacked(_takerData(address(taker), true))
+            orderA, address(exitReceipt), SEPOLIA_USDC, 0.0005 ether, abi.encodePacked(_takerData(address(taker), true))
         );
         assertGt(firstFillOut, 0);
         assertEq(exitReceipt.balanceOf(makerA), 0.0005 ether);
@@ -169,27 +149,34 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
         assertTrue(inventoryCanFill);
         assertGt(inventoryQuote, 0);
         assertLt(inventoryQuote, freshQuote);
+        uint256 inventoryPenaltyBps = (freshQuote - inventoryQuote) * 10_000 / freshQuote;
+        assertGt(inventoryPenaltyBps, 0);
 
         // And a fill that would push exposure past maxExposure must be rejected
         // on the same real feed (0.0005 held + 0.0004 new > 0.0008 max).
         (bool overCanFill,) = _tryQuoteExactIn(orderA, 0.0004 ether);
         assertFalse(overCanFill);
 
+        console2.log("===== SEPOLIA FORK: REAL ORACLE INVENTORY REPRICING =====");
+        console2.log("Real Chainlink ETH/USD feed:", SEPOLIA_CHAINLINK_ETH_USD);
+        console2.log("Real Sepolia USDC:", SEPOLIA_USDC);
+        console2.log("Maker max exposure:", INVENTORY_DEMO_MAX_EXPOSURE);
+        console2.log("Maker receipt inventory after first fill:", exitReceipt.balanceOf(makerA));
         console2.log("Sepolia fork fresh-strategy quote (0.0002 zbETH):", freshQuote);
         console2.log("Sepolia fork inventory-priced quote (0.0002 zbETH):", inventoryQuote);
+        console2.log("Inventory penalty bps vs fresh quote:", inventoryPenaltyBps);
         console2.log("Sepolia fork exposure-rejected quote (0.0004 zbETH):", overCanFill ? "can fill" : "rejected");
     }
 
     function _tryQuoteExactIn(
         ISwapVM.Order memory order,
         uint256 amountIn
-    ) internal returns (bool canFill, uint256 amountOut) {
+    )
+        internal
+        returns (bool canFill, uint256 amountOut)
+    {
         try ISwapVM(address(swapVM)).quote(
-            order,
-            address(exitReceipt),
-            SEPOLIA_USDC,
-            amountIn,
-            abi.encodePacked(_takerData(address(taker), true))
+            order, address(exitReceipt), SEPOLIA_USDC, amountIn, abi.encodePacked(_takerData(address(taker), true))
         ) returns (uint256, uint256 quotedAmountOut, bytes32) {
             return (true, quotedAmountOut);
         } catch {
@@ -199,13 +186,8 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
 
     function _deliverableUsdc(ISwapVM.Order memory order) internal view returns (uint256) {
         bytes32 orderHash = swapVM.hash(order);
-        (, uint256 aquaBalanceOut) = aqua.safeBalances(
-            order.maker,
-            address(swapVM),
-            orderHash,
-            address(exitReceipt),
-            SEPOLIA_USDC
-        );
+        (, uint256 aquaBalanceOut) =
+            aqua.safeBalances(order.maker, address(swapVM), orderHash, address(exitReceipt), SEPOLIA_USDC);
 
         uint256 walletBalance = usdc.balanceOf(order.maker);
         uint256 walletAllowance = usdc.allowance(order.maker, address(aqua));
@@ -218,7 +200,10 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
         ISwapVM.Order memory order,
         uint256,
         uint256 usdcLiquidity
-    ) internal returns (bytes32 orderHash) {
+    )
+        internal
+        returns (bytes32 orderHash)
+    {
         orderHash = swapVM.hash(order);
 
         vm.prank(maker);
@@ -248,39 +233,49 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
         uint32 maxStaleness,
         uint128 maxExposure,
         uint32 inventorySlopeBps
-    ) internal pure returns (bytes memory) {
-        return AquaExitTermArgsBuilder.build(AquaExitTermArgsBuilder.Args({
-            baseDiscountBps: baseDiscountBps,
-            annualRateBps: annualRateBps,
-            maxDiscountBps: maxDiscountBps,
-            maturity: maturity,
-            maxStaleness: maxStaleness,
-            tokenInDecimals: 18,
-            tokenOutDecimals: 6,
-            oracleDecimals: 8,
-            oracleAddress: SEPOLIA_CHAINLINK_ETH_USD,
-            maxExposure: maxExposure,
-            inventorySlopeBps: inventorySlopeBps,
-            maxNotionalOut: 0,
-            liquiditySlopeBps: 0,
-            riskTierBps: 0,
-            minMaturity: 0,
-            maxMaturity: type(uint40).max,
-            allowedTokenIn: address(0),
-            allowedTokenOut: SEPOLIA_USDC,
-            secondaryOracleAddress: address(0),
-            maxDeviationBps: 0,
-            deviationHaircutBps: 0,
-            curveFamily: 0,
-            convexityBps: 0
-        }));
+    )
+        internal
+        pure
+        returns (bytes memory)
+    {
+        return AquaExitTermArgsBuilder.build(
+            AquaExitTermArgsBuilder.Args({
+                baseDiscountBps: baseDiscountBps,
+                annualRateBps: annualRateBps,
+                maxDiscountBps: maxDiscountBps,
+                maturity: maturity,
+                maxStaleness: maxStaleness,
+                tokenInDecimals: 18,
+                tokenOutDecimals: 6,
+                oracleDecimals: 8,
+                oracleAddress: SEPOLIA_CHAINLINK_ETH_USD,
+                maxExposure: maxExposure,
+                inventorySlopeBps: inventorySlopeBps,
+                maxNotionalOut: 0,
+                liquiditySlopeBps: 0,
+                riskTierBps: 0,
+                minMaturity: 0,
+                maxMaturity: type(uint40).max,
+                allowedTokenIn: address(0),
+                allowedTokenOut: SEPOLIA_USDC,
+                secondaryOracleAddress: address(0),
+                maxDeviationBps: 0,
+                deviationHaircutBps: 0,
+                curveFamily: 0,
+                convexityBps: 0
+            })
+        );
     }
 
     function _createExitOrder(
         address maker,
         bytes memory args,
         bytes32 saltSeed
-    ) internal pure returns (ISwapVM.Order memory order) {
+    )
+        internal
+        pure
+        returns (ISwapVM.Order memory order)
+    {
         Program memory p = ProgramBuilder.init(_opcodes());
 
         bytes memory program = bytes.concat(
@@ -290,50 +285,54 @@ contract ZubiDubiSepoliaForkTest is Test, AquaOpcodesDebug {
             p.build(Controls._salt, ControlsArgsBuilder.buildSalt(uint64(uint256(saltSeed))))
         );
 
-        order = MakerTraitsLib.build(MakerTraitsLib.Args({
-            maker: maker,
-            shouldUnwrapWeth: false,
-            useAquaInsteadOfSignature: true,
-            allowZeroAmountIn: false,
-            receiver: address(0),
-            hasPreTransferInHook: false,
-            hasPostTransferInHook: false,
-            hasPreTransferOutHook: false,
-            hasPostTransferOutHook: false,
-            preTransferInTarget: address(0),
-            preTransferInData: "",
-            postTransferInTarget: address(0),
-            postTransferInData: "",
-            preTransferOutTarget: address(0),
-            preTransferOutData: "",
-            postTransferOutTarget: address(0),
-            postTransferOutData: "",
-            program: program
-        }));
+        order = MakerTraitsLib.build(
+            MakerTraitsLib.Args({
+                maker: maker,
+                shouldUnwrapWeth: false,
+                useAquaInsteadOfSignature: true,
+                allowZeroAmountIn: false,
+                receiver: address(0),
+                hasPreTransferInHook: false,
+                hasPostTransferInHook: false,
+                hasPreTransferOutHook: false,
+                hasPostTransferOutHook: false,
+                preTransferInTarget: address(0),
+                preTransferInData: "",
+                postTransferInTarget: address(0),
+                postTransferInData: "",
+                preTransferOutTarget: address(0),
+                preTransferOutData: "",
+                postTransferOutTarget: address(0),
+                postTransferOutData: "",
+                program: program
+            })
+        );
     }
 
     function _takerData(address takerAddress, bool isExactIn) internal pure returns (bytes memory) {
-        return TakerTraitsLib.build(TakerTraitsLib.Args({
-            taker: takerAddress,
-            isExactIn: isExactIn,
-            shouldUnwrapWeth: false,
-            hasPreTransferInCallback: true,
-            hasPreTransferOutCallback: false,
-            isStrictThresholdAmount: false,
-            isFirstTransferFromTaker: false,
-            useTransferFromAndAquaPush: false,
-            threshold: "",
-            to: address(0),
-            deadline: 0,
-            preTransferInHookData: "",
-            postTransferInHookData: "",
-            preTransferOutHookData: "",
-            postTransferOutHookData: "",
-            preTransferInCallbackData: "",
-            preTransferOutCallbackData: "",
-            instructionsArgs: "",
-            signature: ""
-        }));
+        return TakerTraitsLib.build(
+            TakerTraitsLib.Args({
+                taker: takerAddress,
+                isExactIn: isExactIn,
+                shouldUnwrapWeth: false,
+                hasPreTransferInCallback: true,
+                hasPreTransferOutCallback: false,
+                isStrictThresholdAmount: false,
+                isFirstTransferFromTaker: false,
+                useTransferFromAndAquaPush: false,
+                threshold: "",
+                to: address(0),
+                deadline: 0,
+                preTransferInHookData: "",
+                postTransferInHookData: "",
+                preTransferOutHookData: "",
+                postTransferOutHookData: "",
+                preTransferInCallbackData: "",
+                preTransferOutCallbackData: "",
+                instructionsArgs: "",
+                signature: ""
+            })
+        );
     }
 
     function _min(uint256 a, uint256 b) internal pure returns (uint256) {

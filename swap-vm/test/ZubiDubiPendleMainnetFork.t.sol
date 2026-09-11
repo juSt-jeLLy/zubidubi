@@ -143,12 +143,55 @@ contract ZubiDubiPendleMainnetForkTest is Test, AquaOpcodesDebug {
         console2.log("Pendle implied PT -> asset rate (1e18 base):", pendleOk ? pendleRate : 0);
         console2.log("ZubiDubi routed PT -> USDC rate (1e18 base):", ourRate);
         if (pendleOk) {
-            uint256 deltaBps = (pendleRate > ourRate ? pendleRate - ourRate : ourRate - pendleRate) / 1e14;
-            console2.log("Delta vs Pendle implied rate (bps):", deltaBps);
+            int256 signedDeltaBps = _signedBpsDelta(ourRate, pendleRate);
+            console2.log("===== ZUBIDUBI VS PENDLE DEMO BEAT =====");
+            console2.log("Asset: PT-USD3-17DEC2026");
+            console2.log("Pendle implied rate, 1 PT -> asset:", pendleRate);
+            console2.log("ZubiDubi executable routed rate, 1 PT -> USDC:", ourRate);
+            console2.log("ZubiDubi seller improvement vs Pendle, bps:", signedDeltaBps);
+            console2.log("Interpretation: positive bps means this maker/exposure state beats Pendle for the seller.");
             // Sanity: Pendle's own implied rate and our executed rate should be the
             // same dollar-normalized ballpark (both are future USD3 claims to ~$1).
             assertApproxEqRel(pendleRate, ourRate, 0.1e18); // within 10%
         }
+    }
+
+    function test_ZubiDubiPendleMainnetFork_DemoBeatComparesPendleAndInventoryStates() public {
+        uint40 maturity = uint40(IPendleExpiry(ZubiDubiConfig.MAINNET_PENDLE_USD3_MARKET_17DEC2026).expiry());
+        assertEq(maturity, IPendleExpiry(address(ptUsd3)).expiry());
+        assertGt(maturity, block.timestamp);
+
+        ISwapVM.Order memory order = _createExitOrder(
+            makerA, _buildPendlePtExitArgsWithExposure(35, 450, 700, maturity, 400e6, 250), bytes32("pendle-demo-beat")
+        );
+        _shipExitOrder(makerA, order, 500e6);
+        deal(address(usdc), makerA, 500e6);
+
+        (bool pendleOk, uint256 pendleRate) = _readPendlePtToAssetRate();
+        assertTrue(pendleOk);
+
+        (, uint256 freshOut,) = routeExecutor.quoteExactIn(_singleOrder(order), address(ptUsd3), address(usdc), 100e6);
+        uint256 freshRate = freshOut * 1e18 / 100e6;
+
+        deal(address(ptUsd3), address(seller), 200e6);
+        seller.sellExactIn(_singleOrder(order), address(ptUsd3), address(usdc), 200e6, 0, address(seller));
+        assertEq(ptUsd3.balanceOf(makerA), 200e6);
+
+        (, uint256 inventoryOut,) =
+            routeExecutor.quoteExactIn(_singleOrder(order), address(ptUsd3), address(usdc), 100e6);
+        uint256 inventoryRate = inventoryOut * 1e18 / 100e6;
+
+        assertLt(inventoryRate, freshRate);
+
+        console2.log("===== JUDGE DEMO: PENDLE MARKET VS ZUBIDUBI CURVE =====");
+        console2.log("Asset: PT-USD3-17DEC2026");
+        console2.log("Pendle market:", ZubiDubiConfig.MAINNET_PENDLE_USD3_MARKET_17DEC2026);
+        console2.log("Pendle RouterStatic implied PT -> asset rate:", pendleRate);
+        console2.log("ZubiDubi fresh-maker routed PT -> USDC rate:", freshRate);
+        console2.log("ZubiDubi after 200 PT maker inventory rate:", inventoryRate);
+        console2.log("Fresh ZubiDubi vs Pendle bps:", _signedBpsDelta(freshRate, pendleRate));
+        console2.log("Inventory penalty vs fresh ZubiDubi bps:", _signedBpsDelta(inventoryRate, freshRate));
+        console2.log("Demo point: same real PT, live Pendle benchmark, transparent maker inventory repricing.");
     }
 
     function _readPendlePtToAssetRate() internal view returns (bool ok, uint256 rate) {
@@ -224,6 +267,47 @@ contract ZubiDubiPendleMainnetForkTest is Test, AquaOpcodesDebug {
                 oracleAddress: ZubiDubiConfig.MAINNET_CHAINLINK_USDC_USD,
                 maxExposure: 1000e6,
                 inventorySlopeBps: 150,
+                maxNotionalOut: 0,
+                liquiditySlopeBps: 25,
+                riskTierBps: 10,
+                minMaturity: uint40(block.timestamp + 1 days),
+                maxMaturity: type(uint40).max,
+                allowedTokenIn: ZubiDubiConfig.MAINNET_PT_USD3_17DEC2026,
+                allowedTokenOut: ZubiDubiConfig.MAINNET_USDC,
+                secondaryOracleAddress: address(0),
+                maxDeviationBps: 0,
+                deviationHaircutBps: 0,
+                curveFamily: 0,
+                convexityBps: 0
+            })
+        );
+    }
+
+    function _buildPendlePtExitArgsWithExposure(
+        uint32 baseDiscountBps,
+        uint32 annualRateBps,
+        uint32 maxDiscountBps,
+        uint40 maturity,
+        uint128 maxExposure,
+        uint32 inventorySlopeBps
+    )
+        internal
+        view
+        returns (bytes memory)
+    {
+        return AquaExitTermArgsBuilder.build(
+            AquaExitTermArgsBuilder.Args({
+                baseDiscountBps: baseDiscountBps,
+                annualRateBps: annualRateBps,
+                maxDiscountBps: maxDiscountBps,
+                maturity: maturity,
+                maxStaleness: 2 days,
+                tokenInDecimals: 6,
+                tokenOutDecimals: 6,
+                oracleDecimals: 8,
+                oracleAddress: ZubiDubiConfig.MAINNET_CHAINLINK_USDC_USD,
+                maxExposure: maxExposure,
+                inventorySlopeBps: inventorySlopeBps,
                 maxNotionalOut: 0,
                 liquiditySlopeBps: 25,
                 riskTierBps: 10,
@@ -326,5 +410,17 @@ contract ZubiDubiPendleMainnetForkTest is Test, AquaOpcodesDebug {
 
     function _min(uint256 a, uint256 b) internal pure returns (uint256) {
         return a < b ? a : b;
+    }
+
+    function _singleOrder(ISwapVM.Order memory order) internal pure returns (ISwapVM.Order[] memory orders) {
+        orders = new ISwapVM.Order[](1);
+        orders[0] = order;
+    }
+
+    function _signedBpsDelta(uint256 numeratorRate, uint256 denominatorRate) internal pure returns (int256) {
+        if (denominatorRate == 0) {
+            return 0;
+        }
+        return int256((numeratorRate * 10_000) / denominatorRate) - 10_000;
     }
 }
