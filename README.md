@@ -248,7 +248,7 @@ config/zubidubi-markets.json
 | `frontend/src/routes/index.tsx` | landing narrative |
 | `frontend/src/routes/markets.tsx` | live subgraph market board |
 | `frontend/src/routes/sell.tsx` | swap-style early-exit page, quote, benchmark, execute |
-| `frontend/src/routes/make.tsx` | maker strategy builder, real `approve` + `Aqua.ship` |
+| `frontend/src/routes/make.tsx` | maker strategy builder with live dual-axis curve editor, real `approve` + `Aqua.ship` |
 | `frontend/src/routes/portfolio.tsx` | holdings, strategies, route history, acquisition, redemption |
 | `frontend/src/routes/playground.tsx` | live judge demo cockpit: scenario picker, Graph market state, solver quote preview, route split proof, protocol timeline |
 | `frontend/src/services/markets/` | Graph market queries and mappers |
@@ -256,6 +256,7 @@ config/zubidubi-markets.json
 | `frontend/src/services/maker/` | strategy builder API client and Aqua ship transaction |
 | `frontend/src/services/portfolio/` | receipt balance reads, `issue`, `redeem`, claim history |
 | `frontend/src/services/playground/` | deploy-safe playground scenarios, quote mapping, proof catalog, and route preview model |
+| `frontend/src/components/zubi/make/` | modular raw-SVG Time/Exposure curve editor for `BACKING_ORACLE_CHECK -> EXPOSURE_CAP -> DISCOUNT_CURVE_1D` strategy parameters |
 | `frontend/src/components/zubi/AcquireDemoClaims.tsx` | popup flow to deposit backing and mint a maturing claim |
 | `frontend/src/components/zubi/QuoteBenchmarkPanel.tsx` | quote context and maturity/par benchmark |
 | `frontend/src/components/zubi/playground/` | modular playground panels for scenarios, market state, route split, protocol timeline, main proof catalog, detailed visual test map, copyable test commands, GitHub proof links, skipped-maker reasons, and live activity |

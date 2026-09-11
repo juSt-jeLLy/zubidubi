@@ -1,21 +1,18 @@
 import { useWallets } from "@privy-io/react-auth";
 import { createFileRoute } from "@tanstack/react-router";
 import { Check, Loader2, Rocket, ShieldCheck } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { useEffect, useMemo, useReducer, useState } from "react";
 
 import { LiveMakerStrategies } from "@/components/maker/LiveMakerStrategies";
 import { MakeSection } from "@/components/maker/MakeSection";
 import { SliderRow } from "@/components/maker/SliderRow";
-import { Badge } from "@/components/ui/badge";
+import { CurveEditor } from "@/components/zubi/make/CurveEditor";
+import {
+  initialMakeFormState,
+  makeFormReducer,
+  type MakeFormState,
+} from "@/components/zubi/make/makeFormReducer";
+import type { MakerCurveParams } from "@/components/zubi/make/curveMath";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,7 +24,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { curvePoints, fmtNum } from "@/lib/zubi-data";
 import { useMakerStrategyBuild } from "@/services/maker/useMakerStrategyBuild";
 import { shipMakerStrategy } from "@/services/maker/ship";
 import { explorerTxUrl } from "@/services/portfolio/demoClaims";
@@ -56,6 +52,20 @@ export const Route = createFileRoute("/make")({
 });
 
 type ShipPhase = "idle" | "building" | "approving" | "shipping" | "shipped" | "error";
+type NumberFormKey = Extract<
+  keyof MakeFormState,
+  | "baseDiscountPct"
+  | "annualRatePct"
+  | "maxDiscountPct"
+  | "convexity"
+  | "minDays"
+  | "maxDays"
+  | "inventorySlopePct"
+  | "liquiditySlopePct"
+  | "maxExposure"
+  | "quoteLiquidity"
+  | "deviationPct"
+>;
 
 function MakePage() {
   const { address, connect, connecting } = useWallet();
@@ -66,20 +76,7 @@ function MakePage() {
 
   const markets = marketsQuery.data?.markets ?? [];
   const [marketId, setMarketId] = useState("");
-  const [base, setBase] = useState(0.4);
-  const [annualRate, setAnnualRate] = useState(6);
-  const [maxDiscount, setMaxDiscount] = useState(4);
-  const [convex, setConvex] = useState(true);
-  const [convexity, setConvexity] = useState(1.8);
-  const [tier, setTier] = useState("balanced");
-  const [minDays, setMinDays] = useState(1);
-  const [maxDays, setMaxDays] = useState(240);
-  const [quoteLiquidity, setQuoteLiquidity] = useState("25");
-  const [maxExposure, setMaxExposure] = useState("1");
-  const [maxNotionalOut, setMaxNotionalOut] = useState("");
-  const [inventorySlope, setInventorySlope] = useState(1.5);
-  const [liquiditySlope, setLiquiditySlope] = useState(0.6);
-  const [deviation, setDeviation] = useState(0);
+  const [form, dispatch] = useReducer(makeFormReducer, initialMakeFormState);
   const [phase, setPhase] = useState<ShipPhase>("idle");
   const [error, setError] = useState("");
   const [approvalHash, setApprovalHash] = useState<`0x${string}` | null>(null);
@@ -97,16 +94,33 @@ function MakePage() {
 
   useEffect(() => {
     if (!market) return;
-    setQuoteLiquidity(defaultQuoteLiquidity(market));
-    setMaxExposure(defaultExposure(market));
-    setMaxNotionalOut("");
-    if (market.daysToMaturity) setMaxDays(Math.max(45, Math.min(540, market.daysToMaturity + 30)));
+    dispatch({
+      type: "reset-market",
+      quoteLiquidity: defaultQuoteLiquidity(market),
+      maxExposure: defaultExposure(market),
+      maxDays: market.daysToMaturity
+        ? Math.max(45, Math.min(540, market.daysToMaturity + 30))
+        : undefined,
+    });
   }, [market?.id]);
 
-  const data = useMemo(
-    () => curvePoints({ base, annualRate, maxDiscount, convex, convexity, maxDays }),
-    [base, annualRate, maxDiscount, convex, convexity, maxDays],
-  );
+  const setNumber =
+    (key: NumberFormKey) =>
+    (value: number) =>
+      dispatch({ type: "set-number", key, value });
+
+  const setNumericField =
+    (key: NumberFormKey) =>
+    (value: string) =>
+      dispatch({ type: "set-number", key, value: Number(value || 0) });
+
+  const setCurveValue = (key: keyof MakerCurveParams, value: number) => {
+    if (key === "curveFamily") {
+      dispatch({ type: "set-curve-family", value: value === 1 ? 1 : 0 });
+      return;
+    }
+    dispatch({ type: "set-number", key: key as NumberFormKey, value });
+  };
 
   async function ship() {
     try {
@@ -129,20 +143,20 @@ function MakePage() {
         maker: address,
         tokenIn: market.tokenIn,
         tokenOut: market.tokenOut,
-        quoteLiquidity,
-        maxExposure,
-        maxNotionalOut: maxNotionalOut || undefined,
-        baseDiscountPct: base,
-        annualRatePct: annualRate,
-        maxDiscountPct: maxDiscount,
-        inventorySlopePct: inventorySlope,
-        liquiditySlopePct: liquiditySlope,
-        riskTier: tier,
-        minDays,
-        maxDays,
-        curveFamily: convex ? 1 : 0,
-        convexity,
-        deviationPct: deviation,
+        quoteLiquidity: String(form.quoteLiquidity),
+        maxExposure: String(form.maxExposure),
+        maxNotionalOut: form.maxNotionalOut || undefined,
+        baseDiscountPct: form.baseDiscountPct,
+        annualRatePct: form.annualRatePct,
+        maxDiscountPct: form.maxDiscountPct,
+        inventorySlopePct: form.inventorySlopePct,
+        liquiditySlopePct: form.liquiditySlopePct,
+        riskTier: form.riskTier,
+        minDays: form.minDays,
+        maxDays: form.maxDays,
+        curveFamily: form.curveFamily,
+        convexity: form.convexity,
+        deviationPct: form.deviationPct,
       });
       setOrderHash(strategy.orderHash);
 
@@ -212,9 +226,9 @@ function MakePage() {
           </MakeSection>
 
           <MakeSection title="Pricing">
-            <SliderRow label="Base discount" value={base} set={setBase} min={0} max={3} step={0.05} suffix="%" />
-            <SliderRow label="Annual rate" value={annualRate} set={setAnnualRate} min={0} max={25} step={0.5} suffix="%" />
-            <SliderRow label="Max discount" value={maxDiscount} set={setMaxDiscount} min={0.5} max={12} step={0.25} suffix="%" />
+            <SliderRow label="Base discount" value={form.baseDiscountPct} set={setNumber("baseDiscountPct")} min={0} max={3} step={0.05} suffix="%" />
+            <SliderRow label="Annual rate" value={form.annualRatePct} set={setNumber("annualRatePct")} min={0} max={25} step={0.5} suffix="%" />
+            <SliderRow label="Max discount" value={form.maxDiscountPct} set={setNumber("maxDiscountPct")} min={0.5} max={12} step={0.25} suffix="%" />
           </MakeSection>
 
           <MakeSection title="Curve shape">
@@ -222,10 +236,10 @@ function MakePage() {
               {(["linear", "convex"] as const).map((shape) => (
                 <button
                   key={shape}
-                  onClick={() => setConvex(shape === "convex")}
+                  onClick={() => dispatch({ type: "set-curve-family", value: shape === "convex" ? 1 : 0 })}
                   className={cn(
                     "rounded-md border px-3 py-2 text-sm capitalize transition-colors",
-                    (shape === "convex") === convex
+                    (shape === "convex") === (form.curveFamily === 1)
                       ? "border-primary bg-primary/10 text-primary"
                       : "border-border text-muted-foreground hover:bg-surface-2",
                   )}
@@ -234,8 +248,8 @@ function MakePage() {
                 </button>
               ))}
             </div>
-            {convex && (
-              <SliderRow label="Convexity" value={convexity} set={setConvexity} min={1} max={4} step={0.1} suffix="k" />
+            {form.curveFamily === 1 && (
+              <SliderRow label="Convexity" value={form.convexity} set={setNumber("convexity")} min={1} max={4} step={0.1} suffix="k" />
             )}
           </MakeSection>
 
@@ -244,10 +258,10 @@ function MakePage() {
               {["conservative", "balanced", "aggressive"].map((nextTier) => (
                 <button
                   key={nextTier}
-                  onClick={() => setTier(nextTier)}
+                  onClick={() => dispatch({ type: "set-risk", value: nextTier as MakeFormState["riskTier"] })}
                   className={cn(
                     "rounded-md border px-2 py-2 text-xs capitalize transition-colors",
-                    tier === nextTier
+                    form.riskTier === nextTier
                       ? "border-primary bg-primary/10 text-primary"
                       : "border-border text-muted-foreground hover:bg-surface-2",
                   )}
@@ -256,19 +270,19 @@ function MakePage() {
                 </button>
               ))}
             </div>
-            <SliderRow label="Inventory slope" value={inventorySlope} set={setInventorySlope} min={0} max={6} step={0.1} suffix="%" />
-            <SliderRow label="Liquidity slope" value={liquiditySlope} set={setLiquiditySlope} min={0} max={4} step={0.1} suffix="%" />
+            <SliderRow label="Inventory slope" value={form.inventorySlopePct} set={setNumber("inventorySlopePct")} min={0} max={6} step={0.1} suffix="%" />
+            <SliderRow label="Liquidity slope" value={form.liquiditySlopePct} set={setNumber("liquiditySlopePct")} min={0} max={4} step={0.1} suffix="%" />
           </MakeSection>
 
           <MakeSection title="Maturity window" defaultOpen={false}>
-            <SliderRow label="Min days" value={minDays} set={setMinDays} min={1} max={90} step={1} suffix="d" />
-            <SliderRow label="Max days" value={maxDays} set={setMaxDays} min={30} max={540} step={5} suffix="d" />
+            <SliderRow label="Min days" value={form.minDays} set={setNumber("minDays")} min={1} max={90} step={1} suffix="d" />
+            <SliderRow label="Max days" value={form.maxDays} set={setNumber("maxDays")} min={30} max={540} step={5} suffix="d" />
           </MakeSection>
 
           <MakeSection title="Capital limits" defaultOpen={false}>
-            <Field label={`Quote liquidity${market ? ` (${market.quoteSymbol})` : ""}`} value={quoteLiquidity} set={setQuoteLiquidity} />
-            <Field label={`Max receipt exposure${market ? ` (${market.symbol})` : ""}`} value={maxExposure} set={setMaxExposure} />
-            <Field label="Max notional out (optional)" value={maxNotionalOut} set={setMaxNotionalOut} placeholder="Unbounded" />
+            <Field label={`Quote liquidity${market ? ` (${market.quoteSymbol})` : ""}`} value={String(form.quoteLiquidity)} set={setNumericField("quoteLiquidity")} />
+            <Field label={`Max receipt exposure${market ? ` (${market.symbol})` : ""}`} value={String(form.maxExposure)} set={setNumericField("maxExposure")} />
+            <Field label="Max notional out (optional)" value={form.maxNotionalOut} set={(value) => dispatch({ type: "set-text", key: "maxNotionalOut", value })} placeholder="Unbounded" />
           </MakeSection>
 
           <MakeSection title="Oracle safety" defaultOpen={false}>
@@ -282,63 +296,13 @@ function MakePage() {
                 receipt and payout pair.
               </p>
             </div>
-            <SliderRow label="Secondary deviation tolerance" value={deviation} set={setDeviation} min={0} max={3} step={0.1} suffix="%" />
+            <SliderRow label="Secondary deviation tolerance" value={form.deviationPct} set={setNumber("deviationPct")} min={0} max={3} step={0.1} suffix="%" />
           </MakeSection>
         </div>
 
         <div className="space-y-6">
           <div className="panel p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h2 className="text-lg font-semibold">Discount curve</h2>
-                <p className="text-xs text-muted-foreground">
-                  Executed by modular SwapVM oracle, exposure and curve instructions.
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
-                  {convex ? `convex k=${fmtNum(convexity, 1)}` : "linear"}
-                </Badge>
-                <Badge variant="outline" className="text-[10px] uppercase tracking-wider text-primary">
-                  cap {fmtNum(maxDiscount)}%
-                </Badge>
-              </div>
-            </div>
-
-            <div className="mt-6 h-[340px] w-full sm:h-[420px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data} margin={{ top: 10, right: 8, left: -18, bottom: 0 }}>
-                  <CartesianGrid stroke="var(--border)" vertical={false} />
-                  <XAxis dataKey="days" tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} tickLine={false} axisLine={{ stroke: "var(--border)" }} unit="d" />
-                  <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} tickLine={false} axisLine={false} unit="%" domain={[0, Math.ceil(maxDiscount * 1.15)]} />
-                  <Tooltip
-                    contentStyle={{
-                      background: "var(--surface-2)",
-                      border: "1px solid var(--border-strong)",
-                      borderRadius: 8,
-                      fontSize: 12,
-                    }}
-                    labelFormatter={(value) => `${value} days to maturity`}
-                    formatter={(value: number) => [`${fmtNum(value)}%`, "Discount"]}
-                  />
-                  <Area type="monotone" dataKey="discount" stroke="var(--primary)" strokeWidth={2} fill="var(--primary)" fillOpacity={0.12} isAnimationActive={false} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-
-            <dl className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-4">
-              {[
-                { l: "At 30d", v: `${fmtNum(data.find((point) => point.days >= 30)?.discount ?? 0)}%` },
-                { l: "At 180d", v: `${fmtNum(data.find((point) => point.days >= 180)?.discount ?? maxDiscount)}%` },
-                { l: "Window", v: `${minDays}-${maxDays}d` },
-                { l: "Tier", v: tier },
-              ].map((item) => (
-                <div key={item.l} className="bg-surface-2 px-3 py-3">
-                  <dt className="text-[10px] uppercase tracking-widest text-muted-foreground">{item.l}</dt>
-                  <dd className="num mt-1 text-sm capitalize">{item.v}</dd>
-                </div>
-              ))}
-            </dl>
+            <CurveEditor params={form} onChange={setCurveValue} />
 
             <ShipStatus phase={phase} approvalHash={approvalHash} shipHash={shipHash} orderHash={orderHash} error={error} />
 
@@ -456,15 +420,15 @@ function shipButtonLabel(phase: ShipPhase) {
 }
 
 function defaultQuoteLiquidity(market: LiveMarket) {
-  if (market.quoteSymbol.toUpperCase() === "WETH") return "0.01";
-  return "25";
+  if (market.quoteSymbol.toUpperCase() === "WETH") return 0.01;
+  return 25;
 }
 
 function defaultExposure(market: LiveMarket) {
   const symbol = market.symbol.toUpperCase();
-  if (symbol.includes("USD")) return "100";
-  if (symbol.includes("LINK")) return "25";
-  return "0.03";
+  if (symbol.includes("USD")) return 100;
+  if (symbol.includes("LINK")) return 25;
+  return 0.03;
 }
 
 function shortHash(hash: string) {
