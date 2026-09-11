@@ -327,6 +327,91 @@ contract ZubiDubiRouteExecutorTest is AquaSwapVMTest {
         assertEq(quotedIn, 1 ether);
     }
 
+    function test_ZubiDubiRouteExecutor_RoutesSameReceiptIntoNonUsdcPayoutToken() public {
+        TokenMock wethPayout = new TokenMock("Wrapped Ether", "WETH");
+        MockPriceOracle ethEthOracle = new MockPriceOracle(1e18, 18);
+        address makerA = vm.addr(0xA11CE);
+
+        bytes memory args = AquaExitTermArgsBuilder.build(AquaExitTermArgsBuilder.Args({
+            baseDiscountBps: 50,
+            annualRateBps: 600,
+            maxDiscountBps: 300,
+            maturity: uint40(block.timestamp + 30 days),
+            maxStaleness: 1 hours,
+            tokenInDecimals: 18,
+            tokenOutDecimals: 18,
+            oracleDecimals: 18,
+            oracleAddress: address(ethEthOracle),
+            maxExposure: 5 ether,
+            inventorySlopeBps: 0,
+            maxNotionalOut: 0,
+            liquiditySlopeBps: 0,
+            riskTierBps: 0,
+            minMaturity: 0,
+            maxMaturity: type(uint40).max,
+            allowedTokenIn: address(exitReceipt),
+            allowedTokenOut: address(wethPayout),
+            secondaryOracleAddress: address(0),
+            maxDeviationBps: 0,
+            deviationHaircutBps: 0,
+            curveFamily: 0,
+            convexityBps: 0
+        }));
+        ISwapVM.Order memory orderA = _createExitOrderFor(makerA, args, bytes32("maker-weth-payout"));
+        bytes32 orderHashA = swapVM.hash(orderA);
+
+        vm.prank(makerA);
+        exitReceipt.approve(address(aqua), type(uint256).max);
+        vm.prank(makerA);
+        wethPayout.approve(address(aqua), type(uint256).max);
+
+        address[] memory tokens = new address[](2);
+        tokens[0] = address(exitReceipt);
+        tokens[1] = address(wethPayout);
+
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = 0;
+        amounts[1] = 2 ether;
+
+        vm.prank(makerA);
+        assertEq(aqua.ship(address(swapVM), abi.encode(orderA), tokens, amounts), orderHashA);
+
+        wethPayout.mint(makerA, 2 ether);
+        exitReceipt.mint(seller, 1 ether);
+
+        vm.prank(seller);
+        exitReceipt.approve(address(routeExecutor), 1 ether);
+
+        ISwapVM.Order[] memory orders = new ISwapVM.Order[](1);
+        orders[0] = orderA;
+
+        (uint256 quotedIn, uint256 quotedOut,) = routeExecutor.quoteExactIn(
+            orders,
+            address(exitReceipt),
+            address(wethPayout),
+            1 ether
+        );
+        assertEq(quotedIn, 1 ether);
+        assertGt(quotedOut, 0);
+        assertLt(quotedOut, 1 ether);
+
+        vm.prank(seller);
+        (uint256 totalIn, uint256 totalOut) = routeExecutor.routeExactIn(
+            orders,
+            address(exitReceipt),
+            address(wethPayout),
+            1 ether,
+            quotedOut,
+            recipient
+        );
+
+        assertEq(totalIn, 1 ether);
+        assertEq(totalOut, quotedOut);
+        assertEq(wethPayout.balanceOf(recipient), quotedOut);
+        assertGt(wethPayout.balanceOf(feeRecipient), 0);
+        assertEq(exitReceipt.balanceOf(makerA), 1 ether);
+    }
+
     function _buildAquaExitArgs(
         uint32 baseDiscountBps,
         uint32 annualRateBps,

@@ -10,7 +10,7 @@ dataSources:
     source:
       address: "0x30aefbDE9EC52A23E597e338F02f35Da909D7183"
       abi: Aqua
-      startBlock: 11676033
+      startBlock: 11677683
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -39,7 +39,7 @@ dataSources:
     source:
       address: "0x3d39B155De93CB9C340577E06b801C4956ed2a57"
       abi: AquaSwapVMRouter
-      startBlock: 11676033
+      startBlock: 11677683
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -64,7 +64,7 @@ dataSources:
     source:
       address: "0x95d74BF2a83bc3ba50dc5c377cE8fB1478Ae5708"
       abi: ZubiDubiRouteExecutor
-      startBlock: 11676033
+      startBlock: 11677683
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -92,7 +92,7 @@ dataSources:
     source:
       address: "0xb7877571932A025E03a7B9616F254B361FD1759F"
       abi: ZubiDubiExitReceipt
-      startBlock: 11676033
+      startBlock: 11677683
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -108,12 +108,12 @@ dataSources:
           handler: handleReceiptTransfer
       file: ./src/receipt.ts
   - kind: ethereum
-    name: ZubiDubiExitReceipt30D
+    name: ZubiDubiPtZbEth30D
     network: sepolia
     source:
-      address: "0x78890Cd804F902E2BBd84A6984130423879BE45b"
+      address: "0xc53C8D1fFBbb502E1a9004a93Ea33Adc2039F513"
       abi: ZubiDubiExitReceipt
-      startBlock: 11676158
+      startBlock: 11677693
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -129,12 +129,12 @@ dataSources:
           handler: handleReceiptTransfer
       file: ./src/receipt.ts
   - kind: ethereum
-    name: ZubiDubiExitReceipt60D
+    name: ZubiDubiPtZbEth180D
     network: sepolia
     source:
-      address: "0xD49F34d689c79e5a25d674ab684F33873a514d96"
+      address: "0x4Ef8c0e1a313dFf9c25512Fb6dF10C871879A029"
       abi: ZubiDubiExitReceipt
-      startBlock: 11676159
+      startBlock: 11677694
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -150,12 +150,12 @@ dataSources:
           handler: handleReceiptTransfer
       file: ./src/receipt.ts
   - kind: ethereum
-    name: ZubiDubiExitReceipt90D
+    name: ZubiDubiPtZbUsd30D
     network: sepolia
     source:
-      address: "0xa35CBAe88c35b4F06a9992942e889A82388D2Ac8"
+      address: "0xa6D3A922AA36b37cD9E3fB7A0436aC7df310ae57"
       abi: ZubiDubiExitReceipt
-      startBlock: 11676160
+      startBlock: 11677695
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -171,12 +171,12 @@ dataSources:
           handler: handleReceiptTransfer
       file: ./src/receipt.ts
   - kind: ethereum
-    name: ZubiDubiExitReceipt180D
+    name: ZubiDubiPtZbUsd180D
     network: sepolia
     source:
-      address: "0x680Bc9CD0005461A95c75F4A1d3cbADdc7104caB"
+      address: "0x4bd685DA37569691Cc7427B7Ce509a23bc70b044"
       abi: ZubiDubiExitReceipt
-      startBlock: 11676161
+      startBlock: 11677696
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -192,12 +192,33 @@ dataSources:
           handler: handleReceiptTransfer
       file: ./src/receipt.ts
   - kind: ethereum
-    name: ZubiDubiExitReceipt360D
+    name: ZubiDubiPtZbLink30D
     network: sepolia
     source:
-      address: "0x4f7c1919AABC995f41Ad12cfaE25EBF638E8aDE4"
+      address: "0x6D6FDf4D13d2B440CfbfD464A11C55af05964e96"
       abi: ZubiDubiExitReceipt
-      startBlock: 11676162
+      startBlock: 11677697
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Token
+        - ReceiptAsset
+      abis:
+        - name: ZubiDubiExitReceipt
+          file: ./abis/ZubiDubiExitReceipt.json
+      eventHandlers:
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleReceiptTransfer
+      file: ./src/receipt.ts
+  - kind: ethereum
+    name: ZubiDubiPtZbLink180D
+    network: sepolia
+    source:
+      address: "0x5e34350A960911490B9D78f3424BB4303EF29757"
+      abi: ZubiDubiExitReceipt
+      startBlock: 11677698
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9

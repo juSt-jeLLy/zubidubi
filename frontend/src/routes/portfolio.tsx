@@ -148,7 +148,7 @@ function PortfolioPage() {
                   Next action
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  PT-sUSDe is matured. Redeem to underlying or route it through the best maker quote.
+                  PT-zbETH-30D matures next. Redeem to WETH at maturity or route it through the best maker quote.
                 </p>
               </div>
             </section>

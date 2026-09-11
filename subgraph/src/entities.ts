@@ -1,16 +1,23 @@
 import { Address, BigInt, Bytes, ethereum } from '@graphprotocol/graph-ts'
-import { Account, Market, Protocol, StrategyBalance, StrategySnapshot, Token, ZubiDubiStrategy } from '../generated/schema'
+import { Account, Market, Protocol, ReceiptAsset, StrategyBalance, StrategySnapshot, Token, ZubiDubiStrategy } from '../generated/schema'
 import { ZubiDubiExitReceipt } from '../generated/ZubiDubiExitReceipt/ZubiDubiExitReceipt'
 import {
   EXIT_RECEIPT,
+  EXIT_RECEIPT_MATURITY,
+  ONE_E18,
   ONE_BI,
   PROTOCOL_ID,
+  PT_180D_MATURITY,
+  PT_30D_MATURITY,
   PT_ZBETH_180D,
   PT_ZBETH_30D,
-  PT_ZBETH_360D,
-  PT_ZBETH_60D,
-  PT_ZBETH_90D,
+  PT_ZBLINK_180D,
+  PT_ZBLINK_30D,
+  PT_ZBUSD_180D,
+  PT_ZBUSD_30D,
   USDC,
+  WETH,
+  LINK,
   ZERO_BI,
 } from './constants'
 
@@ -42,7 +49,7 @@ export function loadProtocol(event: ethereum.Event): Protocol {
     protocol.slug = 'zubidubi'
     protocol.network = 'sepolia'
     protocol.schemaVersion = '1.0.2-compatible'
-    protocol.subgraphVersion = '0.3.0'
+    protocol.subgraphVersion = '0.9.2'
     protocol.methodologyVersion = '0.1.0'
     protocol.cumulativeStrategyCount = ZERO_BI
     protocol.cumulativeSwapCount = ZERO_BI
@@ -174,6 +181,7 @@ export function snapshotStrategy(strategy: ZubiDubiStrategy, reason: string, eve
 
 export function loadStrategyBalance(strategy: ZubiDubiStrategy, tokenAddress: Address, event: ethereum.Event): StrategyBalance {
   let token = loadToken(tokenAddress)
+  if (token.isReceipt) ensureReceiptAsset(tokenAddress, token, event)
   let id = balanceId(strategy, tokenAddress)
   let balance = StrategyBalance.load(id)
   if (balance == null) {
@@ -189,14 +197,34 @@ export function loadStrategyBalance(strategy: ZubiDubiStrategy, tokenAddress: Ad
   return balance
 }
 
+function ensureReceiptAsset(address: Address, token: Token, event: ethereum.Event): void {
+  let id = address.toHexString()
+  let receipt = ReceiptAsset.load(id)
+  if (receipt != null) return
+
+  receipt = new ReceiptAsset(id)
+  receipt.token = token.id
+  receipt.underlying = knownUnderlying(address)
+  receipt.maturity = knownMaturity(address)
+  receipt.assetsPerReceipt = knownAssetsPerReceipt(address)
+  receipt.totalMinted = ZERO_BI
+  receipt.totalBurned = ZERO_BI
+  receipt.lastUpdatedBlock = event.block.number
+  receipt.lastUpdatedTimestamp = event.block.timestamp
+  receipt.save()
+}
+
 export function symbolFor(address: Address): string {
   if (address.equals(USDC)) return 'USDC'
+  if (address.equals(WETH)) return 'WETH'
+  if (address.equals(LINK)) return 'LINK'
   if (address.equals(EXIT_RECEIPT)) return 'PT-zbETH'
   if (address.equals(PT_ZBETH_30D)) return 'PT-zbETH-30D'
-  if (address.equals(PT_ZBETH_60D)) return 'PT-zbETH-60D'
-  if (address.equals(PT_ZBETH_90D)) return 'PT-zbETH-90D'
   if (address.equals(PT_ZBETH_180D)) return 'PT-zbETH-180D'
-  if (address.equals(PT_ZBETH_360D)) return 'PT-zbETH-360D'
+  if (address.equals(PT_ZBUSD_30D)) return 'PT-zbUSD-30D'
+  if (address.equals(PT_ZBUSD_180D)) return 'PT-zbUSD-180D'
+  if (address.equals(PT_ZBLINK_30D)) return 'PT-zbLINK-30D'
+  if (address.equals(PT_ZBLINK_180D)) return 'PT-zbLINK-180D'
   let receipt = ZubiDubiExitReceipt.bind(address)
   let symbol = receipt.try_symbol()
   if (!symbol.reverted) return symbol.value
@@ -205,6 +233,7 @@ export function symbolFor(address: Address): string {
 
 export function decimalsFor(address: Address): i32 {
   if (address.equals(USDC)) return 6
+  if (address.equals(WETH) || address.equals(LINK)) return 18
   if (isKnownReceipt(address)) return 18
   let receipt = ZubiDubiExitReceipt.bind(address)
   let decimals = receipt.try_decimals()
@@ -215,8 +244,29 @@ export function decimalsFor(address: Address): i32 {
 export function isKnownReceipt(address: Address): boolean {
   return address.equals(EXIT_RECEIPT) ||
     address.equals(PT_ZBETH_30D) ||
-    address.equals(PT_ZBETH_60D) ||
-    address.equals(PT_ZBETH_90D) ||
     address.equals(PT_ZBETH_180D) ||
-    address.equals(PT_ZBETH_360D)
+    address.equals(PT_ZBUSD_30D) ||
+    address.equals(PT_ZBUSD_180D) ||
+    address.equals(PT_ZBLINK_30D) ||
+    address.equals(PT_ZBLINK_180D)
+}
+
+function knownUnderlying(address: Address): Address {
+  if (address.equals(EXIT_RECEIPT) || address.equals(PT_ZBETH_30D) || address.equals(PT_ZBETH_180D)) return WETH
+  if (address.equals(PT_ZBUSD_30D) || address.equals(PT_ZBUSD_180D)) return USDC
+  if (address.equals(PT_ZBLINK_30D) || address.equals(PT_ZBLINK_180D)) return LINK
+  return Address.zero()
+}
+
+function knownMaturity(address: Address): BigInt {
+  if (address.equals(EXIT_RECEIPT)) return EXIT_RECEIPT_MATURITY
+  if (address.equals(PT_ZBETH_30D) || address.equals(PT_ZBUSD_30D) || address.equals(PT_ZBLINK_30D)) return PT_30D_MATURITY
+  if (address.equals(PT_ZBETH_180D) || address.equals(PT_ZBUSD_180D) || address.equals(PT_ZBLINK_180D)) return PT_180D_MATURITY
+  return ZERO_BI
+}
+
+function knownAssetsPerReceipt(address: Address): BigInt {
+  if (address.equals(PT_ZBUSD_30D) || address.equals(PT_ZBUSD_180D)) return BigInt.fromI32(1000000)
+  if (isKnownReceipt(address)) return ONE_E18
+  return ZERO_BI
 }

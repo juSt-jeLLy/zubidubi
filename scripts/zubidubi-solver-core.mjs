@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { createPublicClient, decodeAbiParameters, formatUnits, http, parseAbi, parseUnits } from 'viem'
 import { sepolia } from 'viem/chains'
 
-export const DEFAULT_SUBGRAPH_ENDPOINT = 'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.8.2'
+export const DEFAULT_SUBGRAPH_ENDPOINT = 'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.3'
 export const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 const QUOTE_ABI = parseAbi([
@@ -92,9 +92,16 @@ export function loadSolverConfig(root = DEFAULT_ROOT) {
   loadEnv(join(root, 'subgraph/.env'))
   loadEnv(join(root, 'swap-vm/.env'))
   const deployment = JSON.parse(readFileSync(join(root, 'swap-vm/deployments/sepolia/ZubiDubi.json'), 'utf8'))
+  const markets = JSON.parse(readFileSync(join(root, 'config/zubidubi-markets.json'), 'utf8'))
+  const defaultAsset = markets.sepolia.maturingAssets[0]
+  const defaultQuote = markets.sepolia.quoteAssets[0]
   return {
     root,
     deployment,
+    markets,
+    defaultAsset,
+    defaultTokenIn: defaultAsset.address,
+    defaultTokenOut: defaultQuote.address,
     endpoint: process.env.ZUBIDUBI_SUBGRAPH_ENDPOINT || DEFAULT_SUBGRAPH_ENDPOINT,
     rpcUrl: process.env.SEPOLIA_RPC_URL || process.env.RPC_URL,
   }
@@ -104,8 +111,8 @@ export async function quoteZubiDubiRoute(options = {}) {
   const config = loadSolverConfig(options.root || DEFAULT_ROOT)
   if (!config.rpcUrl) throw new Error('Missing SEPOLIA_RPC_URL in swap-vm/.env or RPC_URL in your environment.')
 
-  const tokenIn = normalize(options.tokenIn || process.env.ZUBIDUBI_TOKEN_IN || config.deployment.exitReceipt)
-  const tokenOut = normalize(options.tokenOut || process.env.ZUBIDUBI_TOKEN_OUT || config.deployment.usdc)
+  const tokenIn = normalize(options.tokenIn || process.env.ZUBIDUBI_TOKEN_IN || config.defaultTokenIn)
+  const tokenOut = normalize(options.tokenOut || process.env.ZUBIDUBI_TOKEN_OUT || config.defaultTokenOut)
   const amountIn = typeof options.amountIn === 'bigint'
     ? options.amountIn
     : parseUnits(String(options.amountIn || process.env.ZUBIDUBI_AMOUNT_IN || '0.003'), Number(options.inputDecimals || 18))

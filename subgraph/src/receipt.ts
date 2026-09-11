@@ -5,17 +5,17 @@ import { loadToken } from './entities'
 import {
   EXIT_RECEIPT,
   EXIT_RECEIPT_MATURITY,
+  LINK,
   ONE_E18,
+  PT_180D_MATURITY,
+  PT_30D_MATURITY,
   PT_ZBETH_180D,
-  PT_ZBETH_180D_MATURITY,
   PT_ZBETH_30D,
-  PT_ZBETH_30D_MATURITY,
-  PT_ZBETH_360D,
-  PT_ZBETH_360D_MATURITY,
-  PT_ZBETH_60D,
-  PT_ZBETH_60D_MATURITY,
-  PT_ZBETH_90D,
-  PT_ZBETH_90D_MATURITY,
+  PT_ZBLINK_180D,
+  PT_ZBLINK_30D,
+  PT_ZBUSD_180D,
+  PT_ZBUSD_30D,
+  USDC,
   WETH,
   ZERO_ADDRESS,
   ZERO_BI,
@@ -62,30 +62,31 @@ export function handleReceiptTransfer(event: Transfer): void {
 }
 
 function knownUnderlying(address: Address): Address {
-  if (isReceiptAddress(address)) return WETH
+  if (address.equals(EXIT_RECEIPT) || address.equals(PT_ZBETH_30D) || address.equals(PT_ZBETH_180D)) return WETH
+  if (address.equals(PT_ZBUSD_30D) || address.equals(PT_ZBUSD_180D)) return USDC
+  if (address.equals(PT_ZBLINK_30D) || address.equals(PT_ZBLINK_180D)) return LINK
   return Address.zero()
 }
 
 function knownAssetsPerReceipt(address: Address): BigInt {
+  if (address.equals(PT_ZBUSD_30D) || address.equals(PT_ZBUSD_180D)) return BigInt.fromI32(1000000)
   if (isReceiptAddress(address)) return ONE_E18
   return ZERO_BI
 }
 
 function knownMaturity(address: Address): BigInt {
   if (address.equals(EXIT_RECEIPT)) return EXIT_RECEIPT_MATURITY
-  if (address.equals(PT_ZBETH_30D)) return PT_ZBETH_30D_MATURITY
-  if (address.equals(PT_ZBETH_60D)) return PT_ZBETH_60D_MATURITY
-  if (address.equals(PT_ZBETH_90D)) return PT_ZBETH_90D_MATURITY
-  if (address.equals(PT_ZBETH_180D)) return PT_ZBETH_180D_MATURITY
-  if (address.equals(PT_ZBETH_360D)) return PT_ZBETH_360D_MATURITY
+  if (address.equals(PT_ZBETH_30D) || address.equals(PT_ZBUSD_30D) || address.equals(PT_ZBLINK_30D)) return PT_30D_MATURITY
+  if (address.equals(PT_ZBETH_180D) || address.equals(PT_ZBUSD_180D) || address.equals(PT_ZBLINK_180D)) return PT_180D_MATURITY
   return ZERO_BI
 }
 
 function isReceiptAddress(address: Address): boolean {
   return address.equals(EXIT_RECEIPT) ||
     address.equals(PT_ZBETH_30D) ||
-    address.equals(PT_ZBETH_60D) ||
-    address.equals(PT_ZBETH_90D) ||
     address.equals(PT_ZBETH_180D) ||
-    address.equals(PT_ZBETH_360D)
+    address.equals(PT_ZBUSD_30D) ||
+    address.equals(PT_ZBUSD_180D) ||
+    address.equals(PT_ZBLINK_30D) ||
+    address.equals(PT_ZBLINK_180D)
 }

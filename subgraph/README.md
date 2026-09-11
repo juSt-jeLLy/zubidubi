@@ -25,9 +25,9 @@ npx graph auth <DEPLOY_KEY>
 npm run deploy:studio
 ```
 
-Live Studio endpoint (v0.8.2, current):
+Live Studio endpoint (v0.9.3, current):
 
-`https://api.studio.thegraph.com/query/1760034/zubidubi/v0.8.2`
+`https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.3`
 
 Run a live provider query:
 
@@ -49,18 +49,19 @@ That command queries active strategies from this live subgraph, decodes the inde
 - AquaSwapVMRouter: `0x3d39B155De93CB9C340577E06b801C4956ed2a57`
 - ZubiDubiRouteExecutor: `0x95d74BF2a83bc3ba50dc5c377cE8fB1478Ae5708`
 - ZubiDubiExitReceipt: `0xb7877571932A025E03a7B9616F254B361FD1759F`
-- Pyth ETH/USD adapter: `0x6d735402E116BcfC5044B6645e090667e68E2eB8`
-- Start block: `11676033` (all datasources aligned to the fixed-convexity-stack deployment block)
+- Pyth ETH/USD adapter: `0xE5179Bf17673A8Ab717F941a5A5BfedE64a2a2a4`
+- Core start block: `11677683` (current multi-asset term-book deployment window)
 
-Additional PT-style Sepolia receipts indexed by v0.8.1:
+Current PT-style Sepolia receipts indexed by v0.9.3:
 
-| Asset | Address | Start block |
-| --- | --- | --- |
-| PT-zbETH-30D | `0x78890Cd804F902E2BBd84A6984130423879BE45b` | 11676158 |
-| PT-zbETH-60D | `0xD49F34d689c79e5a25d674ab684F33873a514d96` | 11676159 |
-| PT-zbETH-90D | `0xa35CBAe88c35b4F06a9992942e889A82388D2Ac8` | 11676160 |
-| PT-zbETH-180D | `0x680Bc9CD0005461A95c75F4A1d3cbADdc7104caB` | 11676161 |
-| PT-zbETH-360D | `0x4f7c1919AABC995f41Ad12cfaE25EBF638E8aDE4` | 11676162 |
+| Asset | Address | Start block | Backing |
+| --- | --- | --- | --- |
+| PT-zbETH-30D | `0xc53C8D1fFBbb502E1a9004a93Ea33Adc2039F513` | 11677693 | WETH |
+| PT-zbETH-180D | `0x4Ef8c0e1a313dFf9c25512Fb6dF10C871879A029` | 11677694 | WETH |
+| PT-zbUSD-30D | `0xa6D3A922AA36b37cD9E3fB7A0436aC7df310ae57` | 11677695 | USDC |
+| PT-zbUSD-180D | `0x4bd685DA37569691Cc7427B7Ce509a23bc70b044` | 11677696 | USDC |
+| PT-zbLINK-30D | `0x6D6FDf4D13d2B440CfbfD464A11C55af05964e96` | 11677697 | LINK |
+| PT-zbLINK-180D | `0x5e34350A960911490B9D78f3424BB4303EF29757` | 11677698 | LINK |
 
 ## Live Proof Transactions
 
@@ -69,7 +70,7 @@ Additional PT-style Sepolia receipts indexed by v0.8.1:
 - Deploy ZubiDubiRouteExecutor: `0x32be16feff1d92c133346bf109836a5fc2364a90805e4ef9a12d5541e48b1e71`
 - Routed fill (convex curve): `0x77518aa105405c1986fd2499f414285ac6ba62f2f7fc10542953f74dbdb46da7`
 
-The v0.8.2 subgraph indexes the hardened fixed-convexity stack plus the five-asset Sepolia term book: 3 original shipped strategies, 5 additional PT-zbETH maturity-bucket strategies, routed fills, DAO fee accrual, receipt issuance, and executable order bytes for the Graph-backed solver. Studio versions v0.6.0/v0.6.1 (pre-fix era, indexing_error) and v0.8.1 (burned by a pre-hardening receipt-metadata mapping) are inert; v0.8.2 is the current production query target. Deleting a Studio version label is a dashboard action (Studio -> Deployments -> kebab menu -> Delete); the graph CLI exposes no per-version removal.
+The v0.9.3 subgraph indexes the hardened core stack plus the live multi-asset Sepolia term book: WETH-, USDC-, and LINK-backed receipts, USDC/WETH payouts, routed fills, DAO fee accrual, receipt issuance, and executable order bytes for the Graph-backed solver. Studio versions v0.6.0/v0.6.1 (indexing_error), v0.8.1 (burned mapping), and v0.8.2 (old WETH-only buckets) are inert; v0.9.3 is the current production query target. Deleting a Studio version label is a dashboard action (Studio -> Deployments -> kebab menu -> Delete); the graph CLI exposes no per-version removal.
 
 ## Where This Improves ZubiDubi
 

@@ -6,10 +6,9 @@ import { loadSolverConfig, normalize, quoteZubiDubiRoute, toPublicQuote } from '
 const quote = await quoteZubiDubiRoute()
 console.log(JSON.stringify(toPublicQuote(quote), null, 2))
 
-// ZUBIDUBI_EXECUTE=1 turns the solver into a taker: it mints fresh backed receipts on
-// Sepolia (WETH deposit -> issue), quotes the Graph-discovered route, then atomically
-// executes it through ZubiDubiRouteExecutor. Set ZUBIDUBI_AMOUNT_IN for the size and
-// ZUBIDUBI_RECIPIENT to route USDC proceeds elsewhere (default: operator EOA).
+// ZUBIDUBI_EXECUTE=1 turns the solver into a taker for the default WETH-backed
+// Sepolia PT market: WETH deposit -> receipt.issue() -> routed Aqua exit.
+// Set ZUBIDUBI_AMOUNT_IN for size and ZUBIDUBI_RECIPIENT for proceeds.
 if (process.env.ZUBIDUBI_EXECUTE === '1') {
   if (!quote.raw.minNetOut || quote.raw.amountIn <= 0n) {
     throw new Error('Route cannot fill the requested amount; aborting execution.')
@@ -27,8 +26,13 @@ async function executeRoute(quote) {
   const publicClient = createPublicClient({ chain: sepolia, transport: http(config.rpcUrl) })
   const recipient = normalize(process.env.ZUBIDUBI_RECIPIENT || account.address)
 
-  const weth = normalize(config.deployment.weth)
-  const exitReceipt = normalize(config.deployment.exitReceipt)
+  const asset = config.markets.sepolia.maturingAssets.find((item) => normalize(item.address) === quote.tokenIn)
+  if (!asset || normalize(asset.underlying) !== normalize(config.deployment.weth)) {
+    throw new Error('Execution mode currently supports the default WETH-backed Sepolia PT receipt. Use quote mode for USDC/LINK-backed markets.')
+  }
+
+  const weth = normalize(asset.underlying)
+  const exitReceipt = normalize(asset.address)
   const executor = normalize(config.deployment.routeExecutor)
   const usdc = normalize(config.deployment.usdc)
 

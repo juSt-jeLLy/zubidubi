@@ -133,7 +133,7 @@ function MakePage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {["USDC", "WETH", "USDT"].map((t) => (
+                  {["USDC", "WETH"].map((t) => (
                     <SelectItem key={t} value={t}>
                       {t}
                     </SelectItem>
