@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "node scripts/zubidubi-solver-api.mjs",
     "zubidubi:graph-quote": "node scripts/zubidubi-graph-solver.mjs",
     "zubidubi:solver-api": "node scripts/zubidubi-solver-api.mjs",
     "zubidubi:pendle-benchmark": "cd swap-vm && forge test --match-contract ZubiDubiPendleMainnetForkTest -vv",

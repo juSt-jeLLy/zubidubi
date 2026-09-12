@@ -3,7 +3,9 @@ export const env = {
   subgraphUrl:
     import.meta.env.VITE_SUBGRAPH_URL ??
     "https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.6",
-  solverApiUrl: import.meta.env.VITE_SOLVER_API_URL ?? "http://localhost:8787",
+  solverApiUrl:
+    import.meta.env.VITE_SOLVER_API_URL ??
+    "https://api-production-105bb.up.railway.app",
 };
 
 export function requireClientEnv(name: keyof typeof env) {

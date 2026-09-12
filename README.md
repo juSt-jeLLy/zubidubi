@@ -187,6 +187,7 @@ Solver API + frontend
 | Original PT-zbETH receipt | `0xb7877571932A025E03a7B9616F254B361FD1759F` | WETH-backed receipt |
 | Pyth ETH/USD adapter | `0xE5179Bf17673A8Ab717F941a5A5BfedE64a2a2a4` | optional dual-oracle path |
 | Subgraph endpoint | `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.6` | live indexed market book |
+| Solver API | `https://api-production-105bb.up.railway.app` | hosted Railway quote/build API |
 | Frontend | `https://frontend-gamma-jade-96.vercel.app` | production Vercel app |
 
 Public Sepolia maturing assets use real Sepolia tokens and real Chainlink feeds:
@@ -431,7 +432,7 @@ Required for local frontend:
 ```text
 VITE_PRIVY_APP_ID=
 VITE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.6
-VITE_SOLVER_API_URL=http://localhost:8787
+VITE_SOLVER_API_URL=https://api-production-105bb.up.railway.app
 ```
 
 Required for contract scripts and solver:
