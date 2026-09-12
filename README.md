@@ -186,7 +186,8 @@ Solver API + frontend
 | ZubiDubiRouteExecutor | `0x99488C09A54092Aa3C7e725137B45f3612CC5be1` | route splitting, deliverability checks, DAO fee, shared term-risk budgets |
 | Original PT-zbETH receipt | `0xb7877571932A025E03a7B9616F254B361FD1759F` | WETH-backed receipt |
 | Pyth ETH/USD adapter | `0xE5179Bf17673A8Ab717F941a5A5BfedE64a2a2a4` | optional dual-oracle path |
-| Subgraph endpoint | `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.5` | live indexed market book |
+| Subgraph endpoint | `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.6` | live indexed market book |
+| Frontend | `https://frontend-gamma-jade-96.vercel.app` | production Vercel app |
 
 Public Sepolia maturing assets use real Sepolia tokens and real Chainlink feeds:
 
@@ -211,7 +212,7 @@ Live shared term-risk budget proof:
 - Budget ID: `0x25df91de3b0b88921665b1290762b8328e4239985cab7fb629b0d44fb642012a`
 - Budget setup tx: `0xbfeb5d8d2054ff1957e572149f1921b4c91fa9c25849416c3ccb09f28101a2ed`
 - Assigned sibling strategies: `PT-zbETH-30D/USDC` and `PT-zbETH-180D/USDC`
-- Indexed by Subgraph Studio `v0.9.5` with `assignmentCount = 2` and `pressurePenaltyBps = 125`
+- Indexed by Subgraph Studio `v0.9.6` with `assignmentCount = 2` and `pressurePenaltyBps = 125`
 - Solver quote now returns budget fields: `budgetRemainingIn = 0.006`, `budgetRemainingOut = 50`
 - Solver quote also returns normalized `budgetPressure` metadata, so `/sell` and `/playground` show budget utilization and active pressure bps beside each maker fill
 
@@ -429,7 +430,7 @@ Required for local frontend:
 
 ```text
 VITE_PRIVY_APP_ID=
-VITE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.5
+VITE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.6
 VITE_SOLVER_API_URL=http://localhost:8787
 ```
 

@@ -25,9 +25,9 @@ npx graph auth <DEPLOY_KEY>
 npm run deploy:studio
 ```
 
-Live Studio endpoint (v0.9.5, current):
+Live Studio endpoint (v0.9.6, current):
 
-`https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.5`
+`https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.6`
 
 Run a live provider query:
 
@@ -52,7 +52,7 @@ That command queries active strategies from this live subgraph, decodes the inde
 - Pyth ETH/USD adapter: `0xE5179Bf17673A8Ab717F941a5A5BfedE64a2a2a4`
 - Core start block: `11677683` (current multi-asset term-book deployment window)
 
-Current PT-style Sepolia receipts indexed by v0.9.5:
+Current PT-style Sepolia receipts indexed by v0.9.6:
 
 | Asset | Address | Start block | Backing |
 | --- | --- | --- | --- |
@@ -70,7 +70,7 @@ Current PT-style Sepolia receipts indexed by v0.9.5:
 - Deploy ZubiDubiRouteExecutor: `0xe8839d020ec655c3a914f5ba7a5c020d507e09afeeffb5277ea22a7b0cb3464f`
 - Routed fill (convex curve): `0x77518aa105405c1986fd2499f414285ac6ba62f2f7fc10542953f74dbdb46da7`
 
-The v0.9.5 subgraph indexes the hardened core stack plus the live multi-asset Sepolia term book: WETH-, USDC-, and LINK-backed receipts, USDC/WETH payouts, routed fills, DAO fee accrual, receipt issuance, executable order bytes, and shared term-risk budget setup/use events for the Graph-backed solver. The live budget entity includes `pressurePenaltyBps`, so the UI can show the same utilization-based repricing policy enforced by the route executor. Studio versions v0.6.0/v0.6.1 (indexing_error), v0.8.1 (burned mapping), and v0.8.2 (old WETH-only buckets) are inert; v0.9.5 is the current production query target. Deleting a Studio version label is a dashboard action (Studio -> Deployments -> kebab menu -> Delete); the graph CLI exposes no per-version removal.
+The v0.9.6 subgraph indexes the hardened core stack plus the live multi-asset Sepolia term book: WETH-, USDC-, and LINK-backed receipts, USDC/WETH payouts, routed fills, DAO fee accrual, receipt issuance, executable order bytes, and shared term-risk budget setup/use events for the Graph-backed solver. The live budget entity includes `pressurePenaltyBps`, so the UI can show the same utilization-based repricing policy enforced by the route executor. Studio versions v0.6.0/v0.6.1 (indexing_error), v0.8.1 (burned mapping), v0.8.2 (old WETH-only buckets), and v0.9.5 (previous live version) are inert; v0.9.6 is the current production query target. Deleting a Studio version label is a dashboard action (Studio -> Deployments -> kebab menu -> Delete); the graph CLI exposes no per-version removal.
 
 ## Where This Improves ZubiDubi
 
