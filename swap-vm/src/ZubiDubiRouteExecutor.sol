@@ -348,8 +348,15 @@ contract ZubiDubiRouteExecutor is ITakerCallbacks {
         quote.deliverableOut = grossDeliverableOut > reservedOut ? grossDeliverableOut - reservedOut : 0;
 
         uint256 maxIn = remaining;
+        uint256 pressurePenaltyBps;
         if (membership.active) {
             (uint256 budgetRemainingIn, uint256 budgetRemainingOut) = _remainingBudget(
+                order.maker,
+                membership.budgetId,
+                reservedBudgetIn,
+                reservedBudgetOut
+            );
+            pressurePenaltyBps = _budgetPressurePenaltyBps(
                 order.maker,
                 membership.budgetId,
                 reservedBudgetIn,
@@ -371,7 +378,7 @@ contract ZubiDubiRouteExecutor is ITakerCallbacks {
 
         (bool ok, uint256 out) = _tryQuote(order, tokenIn, tokenOut, maxIn);
         if (!ok) {
-            maxIn = _maxFillForDeliverable(order, tokenIn, tokenOut, maxIn, quote.deliverableOut);
+            maxIn = _maxFillForDeliverable(order, tokenIn, tokenOut, maxIn, quote.deliverableOut, pressurePenaltyBps);
             if (maxIn == 0) {
                 quote.skipped = true;
                 return (fill, quote);
@@ -382,14 +389,16 @@ contract ZubiDubiRouteExecutor is ITakerCallbacks {
                 return (fill, quote);
             }
         }
+        out = _applyBudgetPressurePenalty(out, pressurePenaltyBps);
 
         if (out > quote.deliverableOut) {
-            maxIn = _maxFillForDeliverable(order, tokenIn, tokenOut, maxIn, quote.deliverableOut);
+            maxIn = _maxFillForDeliverable(order, tokenIn, tokenOut, maxIn, quote.deliverableOut, pressurePenaltyBps);
             if (maxIn == 0) {
                 quote.skipped = true;
                 return (fill, quote);
             }
             (ok, out) = _tryQuote(order, tokenIn, tokenOut, maxIn);
+            if (ok) out = _applyBudgetPressurePenalty(out, pressurePenaltyBps);
             if (!ok || out > quote.deliverableOut) {
                 quote.skipped = true;
                 return (fill, quote);
@@ -412,12 +421,14 @@ contract ZubiDubiRouteExecutor is ITakerCallbacks {
         address tokenIn,
         address tokenOut,
         uint256 high,
-        uint256 deliverableOut
+        uint256 deliverableOut,
+        uint256 pressurePenaltyBps
     ) private view returns (uint256 best) {
         uint256 low = 1;
         while (low <= high) {
             uint256 mid = (low + high) / 2;
             (bool ok, uint256 out) = _tryQuote(order, tokenIn, tokenOut, mid);
+            if (ok) out = _applyBudgetPressurePenalty(out, pressurePenaltyBps);
             if (ok && out <= deliverableOut) {
                 best = mid;
                 low = mid + 1;
@@ -425,6 +436,15 @@ contract ZubiDubiRouteExecutor is ITakerCallbacks {
                 high = mid - 1;
             }
         }
+    }
+
+    function _applyBudgetPressurePenalty(
+        uint256 amountOut,
+        uint256 pressurePenaltyBps
+    ) private pure returns (uint256) {
+        if (pressurePenaltyBps == 0 || amountOut == 0) return amountOut;
+        if (pressurePenaltyBps >= 10_000) return 0;
+        return amountOut * (10_000 - pressurePenaltyBps) / 10_000;
     }
 
     function _tryQuote(
@@ -578,6 +598,32 @@ contract ZubiDubiRouteExecutor is ITakerCallbacks {
         } else if (uint256(budget.quoteSpent) + reservedOut < budget.maxQuoteSpend) {
             remainingOut = uint256(budget.maxQuoteSpend) - uint256(budget.quoteSpent) - reservedOut;
         }
+    }
+
+    function _budgetPressurePenaltyBps(
+        address maker,
+        bytes32 budgetId,
+        uint256 reservedIn,
+        uint256 reservedOut
+    ) private view returns (uint256 penaltyBps) {
+        TermRiskBudget memory budget = termRiskBudgets[_budgetKey(maker, budgetId)];
+        if (!budget.exists || budget.pressurePenaltyBps == 0) return 0;
+
+        uint256 utilizationBps;
+        if (budget.maxReceiptExposure != 0) {
+            uint256 receiptUtilizationBps =
+                (uint256(budget.receiptExposure) + reservedIn) * 10_000 / uint256(budget.maxReceiptExposure);
+            utilizationBps = _min(receiptUtilizationBps, 10_000);
+        }
+        if (budget.maxQuoteSpend != 0) {
+            uint256 quoteUtilizationBps =
+                (uint256(budget.quoteSpent) + reservedOut) * 10_000 / uint256(budget.maxQuoteSpend);
+            uint256 cappedQuoteUtilizationBps = _min(quoteUtilizationBps, 10_000);
+            if (cappedQuoteUtilizationBps > utilizationBps) utilizationBps = cappedQuoteUtilizationBps;
+        }
+
+        penaltyBps = uint256(budget.pressurePenaltyBps) * utilizationBps / 10_000;
+        if (penaltyBps > 10_000) penaltyBps = 10_000;
     }
 
     function _recordBudgetFill(

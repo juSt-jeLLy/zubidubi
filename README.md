@@ -10,7 +10,7 @@ ZubiDubi is built on **Aqua** and **SwapVM**:
 - SwapVM executes reusable term-liquidity instructions for oracle backing, exposure caps, and maturity-aware discount curves.
 - The Graph reconstructs the live market book for discovery.
 - The route executor verifies real deliverable liquidity onchain before any fill can happen.
-- Shared term-risk budgets let one maker reserve coordinate sibling Aqua strategies, so the first fill reduces capacity across the rest of the maker's book.
+- Shared term-risk budgets let one maker reserve coordinate sibling Aqua strategies, so rising book usage both reduces capacity and applies a utilization-based pressure discount across the rest of the maker's book.
 
 ## The Problem
 
@@ -176,10 +176,10 @@ Solver API + frontend
 | --- | --- | --- |
 | Aqua | `0x30aefbDE9EC52A23E597e338F02f35Da909D7183` | shared liquidity settlement |
 | AquaSwapVMRouter | `0x3d39B155De93CB9C340577E06b801C4956ed2a57` | modified router with reusable term-liquidity instructions |
-| ZubiDubiRouteExecutor | `0x5b9f90FDe93d0284A3a937078D6DDEF678816127` | route splitting, deliverability checks, DAO fee, shared term-risk budgets |
+| ZubiDubiRouteExecutor | `0x99488C09A54092Aa3C7e725137B45f3612CC5be1` | route splitting, deliverability checks, DAO fee, shared term-risk budgets |
 | Original PT-zbETH receipt | `0xb7877571932A025E03a7B9616F254B361FD1759F` | WETH-backed receipt |
 | Pyth ETH/USD adapter | `0xE5179Bf17673A8Ab717F941a5A5BfedE64a2a2a4` | optional dual-oracle path |
-| Subgraph endpoint | `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.4` | live indexed market book |
+| Subgraph endpoint | `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.5` | live indexed market book |
 
 Public Sepolia maturing assets use real Sepolia tokens and real Chainlink feeds:
 
@@ -200,11 +200,11 @@ config/zubidubi-markets.json
 
 Live shared term-risk budget proof:
 
-- Budget-aware executor: `0x5b9f90FDe93d0284A3a937078D6DDEF678816127`
+- Budget-aware executor: `0x99488C09A54092Aa3C7e725137B45f3612CC5be1`
 - Budget ID: `0x25df91de3b0b88921665b1290762b8328e4239985cab7fb629b0d44fb642012a`
-- Budget setup tx: `0x6e5834b0de0631053de4c826f74004ef4e2ef4abe4ba25cecf96e1975f9e7815`
+- Budget setup tx: `0xbfeb5d8d2054ff1957e572149f1921b4c91fa9c25849416c3ccb09f28101a2ed`
 - Assigned sibling strategies: `PT-zbETH-30D/USDC` and `PT-zbETH-180D/USDC`
-- Indexed by Subgraph Studio `v0.9.4` with `assignmentCount = 2`
+- Indexed by Subgraph Studio `v0.9.5` with `assignmentCount = 2` and `pressurePenaltyBps = 125`
 - Solver quote now returns budget fields: `budgetRemainingIn = 0.006`, `budgetRemainingOut = 50`
 
 ## Repository Map
@@ -419,7 +419,7 @@ Required for local frontend:
 
 ```text
 VITE_PRIVY_APP_ID=
-VITE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.4
+VITE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.5
 VITE_SOLVER_API_URL=http://localhost:8787
 ```
 

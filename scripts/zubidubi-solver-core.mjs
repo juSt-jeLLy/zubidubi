@@ -15,7 +15,7 @@ import {
 } from 'viem'
 import { sepolia } from 'viem/chains'
 
-export const DEFAULT_SUBGRAPH_ENDPOINT = 'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.4'
+export const DEFAULT_SUBGRAPH_ENDPOINT = 'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.5'
 export const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 const QUOTE_ABI = parseAbi([

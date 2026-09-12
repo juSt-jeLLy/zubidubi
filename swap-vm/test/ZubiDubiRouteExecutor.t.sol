@@ -517,7 +517,10 @@ contract ZubiDubiRouteExecutorTest is AquaSwapVMTest {
         ISwapVM.Order[] memory siblingRoute = new ISwapVM.Order[](1);
         siblingRoute[0] = orderB;
 
-        (uint256 quotedIn,, ZubiDubiRouteExecutor.Quote[] memory quotes) = routeExecutor.quoteExactIn(
+        vm.prank(maker);
+        routeExecutor.setTermRiskBudget(budgetId, uint128(1.5 ether), uint128(10_000 ether), 0);
+
+        (uint256 quotedIn, uint256 unpressuredOut, ZubiDubiRouteExecutor.Quote[] memory quotes) = routeExecutor.quoteExactIn(
             siblingRoute,
             address(exitReceipt),
             address(usdc),
@@ -527,6 +530,21 @@ contract ZubiDubiRouteExecutorTest is AquaSwapVMTest {
         assertEq(quotedIn, 0.5 ether);
         assertEq(quotes[0].budgetRemainingIn, 0.5 ether);
         assertEq(quotes[0].fillIn, 0.5 ether);
+
+        vm.prank(maker);
+        routeExecutor.setTermRiskBudget(budgetId, uint128(1.5 ether), uint128(10_000 ether), 1_000);
+
+        (uint256 pressuredQuotedIn, uint256 pressuredOut, ZubiDubiRouteExecutor.Quote[] memory pressuredQuotes) =
+            routeExecutor.quoteExactIn(
+                siblingRoute,
+                address(exitReceipt),
+                address(usdc),
+                1 ether
+            );
+
+        assertEq(pressuredQuotedIn, quotedIn);
+        assertEq(pressuredQuotes[0].budgetRemainingIn, 0.5 ether);
+        assertLt(pressuredOut, unpressuredOut);
     }
 
     function _buildAquaExitArgs(
