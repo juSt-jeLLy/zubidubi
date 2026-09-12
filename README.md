@@ -138,7 +138,8 @@ ZubiDubi adds an explicit maker-level budget layer in `ZubiDubiRouteExecutor`:
 - multiple Aqua strategies can be assigned to that same budget
 - quotes are capped by the remaining global receipt and quote budget
 - execution consumes the budget immediately, so sibling strategies lose capacity in future quotes
-- the budget is indexed by The Graph and shown in maker portfolio and playground proof views
+- `pressurePenaltyBps` applies a utilization-scaled quote haircut as the shared budget fills
+- the budget is indexed by The Graph and shown in maker portfolio, sell route previews, and playground proof views
 
 This turns wallet-held Aqua liquidity into a coordinated term-liquidity book instead of independent strategies racing the same maker balance.
 
@@ -206,6 +207,7 @@ Live shared term-risk budget proof:
 - Assigned sibling strategies: `PT-zbETH-30D/USDC` and `PT-zbETH-180D/USDC`
 - Indexed by Subgraph Studio `v0.9.5` with `assignmentCount = 2` and `pressurePenaltyBps = 125`
 - Solver quote now returns budget fields: `budgetRemainingIn = 0.006`, `budgetRemainingOut = 50`
+- Solver quote also returns normalized `budgetPressure` metadata, so `/sell` and `/playground` show budget utilization and active pressure bps beside each maker fill
 
 ## Repository Map
 
@@ -260,7 +262,7 @@ Live shared term-risk budget proof:
 
 | Path | Purpose |
 | --- | --- |
-| `scripts/zubidubi-solver-core.mjs` | Graph discovery, route quote, benchmark field, maker strategy byte builder |
+| `scripts/zubidubi-solver-core.mjs` | Graph discovery, route quote, shared-budget pressure metadata, benchmark field, maker strategy byte builder |
 | `scripts/zubidubi-solver-api.mjs` | local API: `GET /health`, `GET /pitch`, `GET /markets`, `GET|POST /quote`, `POST /strategies/build` |
 | `scripts/zubidubi-graph-solver.mjs` | CLI graph solver, optional execute mode |
 | `scripts/update-pyth-sepolia.mjs` | refreshes Pyth price before dual-oracle fills |
@@ -271,10 +273,10 @@ Live shared term-risk budget proof:
 | --- | --- |
 | `frontend/src/routes/index.tsx` | landing narrative |
 | `frontend/src/routes/markets.tsx` | live subgraph market board |
-| `frontend/src/routes/sell.tsx` | swap-style early-exit page, quote, benchmark, execute |
+| `frontend/src/routes/sell.tsx` | swap-style early-exit page, quote, maker split pressure badges, benchmark, execute |
 | `frontend/src/routes/make.tsx` | maker strategy builder with live dual-axis curve editor, real `approve` + `Aqua.ship` |
 | `frontend/src/routes/portfolio.tsx` | holdings, strategies, route history, acquisition, redemption |
-| `frontend/src/routes/playground.tsx` | live judge demo cockpit: scenario picker, Graph market state, solver quote preview, route split proof, protocol timeline |
+| `frontend/src/routes/playground.tsx` | live judge demo cockpit: scenario picker, Graph market state, solver quote preview, route split proof with pressure badges, protocol timeline |
 | `frontend/src/services/markets/` | Graph market queries and mappers |
 | `frontend/src/services/solver/` | solver quote client, route execution, quote benchmarks |
 | `frontend/src/services/maker/` | strategy builder API client and Aqua ship transaction |
@@ -283,7 +285,7 @@ Live shared term-risk budget proof:
 | `frontend/src/components/zubi/make/` | modular raw-SVG Time/Exposure curve editor for `BACKING_ORACLE_CHECK -> EXPOSURE_CAP -> DISCOUNT_CURVE_1D` strategy parameters |
 | `frontend/src/components/zubi/AcquireDemoClaims.tsx` | popup flow to deposit backing and mint a maturing claim |
 | `frontend/src/components/zubi/QuoteBenchmarkPanel.tsx` | quote context and maturity/par benchmark |
-| `frontend/src/components/zubi/playground/` | modular playground panels for scenarios, market state, route split, protocol timeline, main proof catalog, detailed visual test map, copyable test commands, GitHub proof links, skipped-maker reasons, and live activity |
+| `frontend/src/components/zubi/playground/` | modular playground panels for scenarios, market state, route split, shared-budget pressure visibility, protocol timeline, main proof catalog, detailed visual test map, copyable test commands, GitHub proof links, skipped-maker reasons, and live activity |
 | `frontend/public/test-results/latest.json` | deploy-safe latest known proof status artifact for the Playground |
 
 ## Frontend Product Flow
@@ -293,10 +295,10 @@ The frontend is not static. It uses the same live systems as the contracts and s
 | Page | Live behavior |
 | --- | --- |
 | `/markets` | reads Subgraph Studio market data every 15 seconds |
-| `/sell` | asks solver API for fresh route quote, blocks if insufficient liquidity, executes `approve` + `routeExactIn` |
+| `/sell` | asks solver API for fresh route quote, shows maker split plus shared-budget utilization/pressure bps, blocks if insufficient liquidity, executes `approve` + `routeExactIn` |
 | `/make` | builds encoded SwapVM strategy via `POST /strategies/build`, then executes `approve(quoteToken -> Aqua)`, `Aqua.ship(...)`, and optional shared term-risk budget registration |
 | `/portfolio` | reads wallet receipt balances from contracts, maker strategies, shared budgets and routes from The Graph, submits real `issue()` and `redeem()` |
-| `/playground` | deployable judge cockpit with live Graph markets, solver quotes, route split previews, budget/skip reasons, protocol proof timeline, activity tape, main proof catalog, copyable commands, GitHub proof links, latest proof status, and visual test map for curve, routing, guardrail, receipt, fork, and indexing tests |
+| `/playground` | deployable judge cockpit with live Graph markets, solver quotes, route split previews, budget pressure/skip reasons, protocol proof timeline, activity tape, main proof catalog, copyable commands, GitHub proof links, latest proof status, and visual test map for curve, routing, guardrail, receipt, fork, and indexing tests |
 
 ## Tests and Proofs
 
@@ -314,6 +316,7 @@ The route executor suite includes shared-budget proofs:
 
 - sibling strategies assigned to one budget cannot collectively exceed the maker's global reserve
 - once one strategy fills, budget exposure/spend is consumed and the next sibling quote loses capacity
+- pressure repricing makes later sibling quotes worse as the shared budget becomes more utilized
 
 ### Invariants
 
