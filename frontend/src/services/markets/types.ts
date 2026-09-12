@@ -87,6 +87,38 @@ export type GraphRouteFee = {
   blockNumber: string;
 };
 
+export type GraphTermRiskBudget = {
+  id: string;
+  maker: { id: string };
+  budgetId: string;
+  maxReceiptExposure: string;
+  maxQuoteSpend: string;
+  receiptExposure: string;
+  quoteSpent: string;
+  pressurePenaltyBps: string;
+  assignmentCount: string;
+  fillCount: string;
+  lastUpdatedBlock: string;
+  lastUpdatedTimestamp: string;
+};
+
+export type GraphTermRiskBudgetUse = {
+  id: string;
+  maker: { id: string };
+  budget: {
+    id: string;
+    budgetId: string;
+  };
+  orderHash: string;
+  fillIn: string;
+  amountOut: string;
+  receiptExposure: string;
+  quoteSpent: string;
+  transactionHash: string;
+  blockNumber: string;
+  timestamp: string;
+};
+
 export type MarketBoardResponse = {
   _meta: {
     hasIndexingErrors: boolean;
@@ -108,6 +140,8 @@ export type MarketBoardResponse = {
   routeFills: GraphRouteFill[];
   strategySnapshots: GraphStrategySnapshot[];
   routeFees: GraphRouteFee[];
+  termRiskBudgets: GraphTermRiskBudget[];
+  termRiskBudgetUses: GraphTermRiskBudgetUse[];
 };
 
 export type LiveMarket = {
@@ -149,4 +183,8 @@ export type MarketBoard = {
   receiptAssets: GraphReceiptAsset[];
   /** quoteToken address (lowercased) -> symbol/decimals, used to label backing tokens. */
   underlyingTokens: Record<string, { symbol: string; decimals: number }>;
+  /** Shared maker term-risk budget records indexed from the route executor. */
+  termRiskBudgets: GraphTermRiskBudget[];
+  /** Recent budget consumption events, useful for solver/playground audit trails. */
+  termRiskBudgetUses: GraphTermRiskBudgetUse[];
 };

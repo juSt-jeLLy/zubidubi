@@ -115,6 +115,19 @@ export const PLAYGROUND_PROOFS: PlaygroundProofCard[] = [
     lastRun: "2026-09-12",
   },
   {
+    id: "shared-term-risk-budget",
+    title: "Shared term-risk budget",
+    whatItProves:
+      "Sibling Aqua strategies can share one finite maker reserve, so the first fill reduces capacity for the rest.",
+    file: "swap-vm/test/ZubiDubiRouteExecutor.t.sol",
+    line: 415,
+    command:
+      "cd swap-vm && forge test --match-contract ZubiDubiRouteExecutorTest --match-test '.*Budget.*' -vv",
+    status: "contract",
+    result: "passed",
+    lastRun: "2026-09-12",
+  },
+  {
     id: "receipt-lifecycle",
     title: "Maturing claim lifecycle",
     whatItProves:
@@ -418,6 +431,18 @@ export const PLAYGROUND_TEST_GROUPS: PlaygroundTestGroup[] = [
         line: 330,
         result: "passed",
         proves: "The same receipt market can route into WETH, not only USDC.",
+      },
+      {
+        name: "test_ZubiDubiRouteExecutor_SharedTermRiskBudgetCapsSiblingStrategies",
+        line: 415,
+        result: "passed",
+        proves: "Sibling Aqua strategies cannot collectively exceed one maker-defined term-risk reserve.",
+      },
+      {
+        name: "test_ZubiDubiRouteExecutor_ExecutionConsumesSharedBudgetForFutureQuotes",
+        line: 478,
+        result: "passed",
+        proves: "After one strategy fills, the shared reserve shrinks and sibling quotes lose capacity.",
       },
     ],
   },

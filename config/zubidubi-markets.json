@@ -5,7 +5,7 @@
     "core": {
       "aqua": "0x30aefbDE9EC52A23E597e338F02f35Da909D7183",
       "aquaSwapVMRouter": "0x3d39B155De93CB9C340577E06b801C4956ed2a57",
-      "routeExecutor": "0x95d74BF2a83bc3ba50dc5c377cE8fB1478Ae5708"
+      "routeExecutor": "0x99488C09A54092Aa3C7e725137B45f3612CC5be1"
     },
     "quoteAssets": [
       {

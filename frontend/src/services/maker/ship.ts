@@ -11,9 +11,15 @@ const AQUA_ABI = parseAbi([
   "function ship(address app,bytes strategy,address[] tokens,uint256[] amounts) returns (bytes32 strategyHash)",
 ]);
 
+const ROUTE_EXECUTOR_ABI = parseAbi([
+  "function setTermRiskBudget(bytes32 budgetId,uint128 maxReceiptExposure,uint128 maxQuoteSpend,uint32 pressurePenaltyBps)",
+  "function assignOrderTermRiskBudget(bytes32 orderHash,bytes32 budgetId,address receiptToken,address quoteToken)",
+]);
+
 export type ShipMakerCallbacks = {
   onApprovalSubmitted?: (hash: `0x${string}`) => void;
   onShipSubmitted?: (hash: `0x${string}`) => void;
+  onBudgetSubmitted?: (hash: `0x${string}`) => void;
 };
 
 export async function shipMakerStrategy(
@@ -60,6 +66,36 @@ export async function shipMakerStrategy(
   });
   callbacks?.onShipSubmitted?.(shipHash);
   await publicClient.waitForTransactionReceipt({ hash: shipHash });
+
+  if (strategy.termRiskBudget && strategy.orderHash) {
+    const budgetHash = await walletClient.writeContract({
+      address: strategy.core.routeExecutor as `0x${string}`,
+      abi: ROUTE_EXECUTOR_ABI,
+      functionName: "setTermRiskBudget",
+      args: [
+        strategy.termRiskBudget.id,
+        BigInt(strategy.termRiskBudget.maxReceiptExposureRaw),
+        BigInt(strategy.termRiskBudget.maxQuoteSpendRaw),
+        strategy.termRiskBudget.pressurePenaltyBps,
+      ],
+    });
+    callbacks?.onBudgetSubmitted?.(budgetHash);
+    await publicClient.waitForTransactionReceipt({ hash: budgetHash });
+
+    const assignHash = await walletClient.writeContract({
+      address: strategy.core.routeExecutor as `0x${string}`,
+      abi: ROUTE_EXECUTOR_ABI,
+      functionName: "assignOrderTermRiskBudget",
+      args: [
+        strategy.orderHash as `0x${string}`,
+        strategy.termRiskBudget.id,
+        strategy.termRiskBudget.receiptToken,
+        strategy.termRiskBudget.quoteToken,
+      ],
+    });
+    callbacks?.onBudgetSubmitted?.(assignHash);
+    await publicClient.waitForTransactionReceipt({ hash: assignHash });
+  }
 
   return { approvalHash, shipHash, orderHash: strategy.orderHash };
 }

@@ -8,16 +8,18 @@ import {
   encodePacked,
   formatUnits,
   http,
+  keccak256,
   parseAbi,
   parseUnits,
+  toBytes,
 } from 'viem'
 import { sepolia } from 'viem/chains'
 
-export const DEFAULT_SUBGRAPH_ENDPOINT = 'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.3'
+export const DEFAULT_SUBGRAPH_ENDPOINT = 'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.6'
 export const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 const QUOTE_ABI = parseAbi([
-  'function quoteExactIn((address maker,uint256 traits,bytes data)[] orders,address tokenIn,address tokenOut,uint256 amountIn) view returns (uint256 totalIn,uint256 totalOut,(bytes32 orderHash,address maker,uint256 fillIn,uint256 amountOut,uint256 deliverableOut,bool skipped)[] quotes)',
+  'function quoteExactIn((address maker,uint256 traits,bytes data)[] orders,address tokenIn,address tokenOut,uint256 amountIn) view returns (uint256 totalIn,uint256 totalOut,(bytes32 orderHash,address maker,uint256 fillIn,uint256 amountOut,uint256 deliverableOut,bytes32 budgetId,uint256 budgetRemainingIn,uint256 budgetRemainingOut,bool skipped)[] quotes)',
 ])
 
 const ROUTER_ABI = parseAbi([
@@ -58,6 +60,15 @@ const SOLVER_QUERY = `query SolverStrategies($tokenIn: String!, $tokenOut: Strin
     quoteVirtualBalance
     exposureAmount
     quotePulledAmount
+    budget {
+      id
+      budgetId
+      maxReceiptExposure
+      maxQuoteSpend
+      receiptExposure
+      quoteSpent
+      pressurePenaltyBps
+    }
     maker { id }
     receiptToken { id symbol decimals }
     quoteToken { id symbol decimals }
@@ -154,8 +165,18 @@ export async function quoteZubiDubiRoute(options = {}) {
 
   const quoteTokenDecimals = Number(strategies[0].quoteToken.decimals)
   const receiptDecimals = Number(strategies[0].receiptToken.decimals)
-  const quoteCandidates = quotes.filter((quote) => quote.fillIn > 0n && !quote.skipped)
-  const skippedQuotes = quotes.filter((quote) => quote.skipped)
+  const strategyByOrderHash = new Map(strategies.map((strategy) => [String(strategy.orderHash).toLowerCase(), strategy]))
+  const enrichedQuotes = quotes.map((quote) => ({
+    ...quote,
+    budgetPressure: buildBudgetPressureMeta(
+      quote,
+      strategyByOrderHash.get(String(quote.orderHash).toLowerCase())?.budget,
+      receiptDecimals,
+      quoteTokenDecimals,
+    ),
+  }))
+  const quoteCandidates = enrichedQuotes.filter((quote) => quote.fillIn > 0n && !quote.skipped)
+  const skippedQuotes = enrichedQuotes.filter((quote) => quote.skipped)
   const routePreview = buildBestFirstPreview(quoteCandidates, amountIn, receiptDecimals, quoteTokenDecimals)
   const canExecute = totalIn === amountIn
   const fillStatus = canExecute ? 'FULL' : totalIn > 0n ? 'PARTIAL' : 'NONE'
@@ -194,13 +215,21 @@ export async function quoteZubiDubiRoute(options = {}) {
       fillIn: formatUnits(quote.fillIn, receiptDecimals),
       amountOut: formatUnits(quote.amountOut, quoteTokenDecimals),
       deliverableOut: formatUnits(quote.deliverableOut, quoteTokenDecimals),
+      budgetId: quote.budgetId,
+      budgetRemainingIn: formatUnits(quote.budgetRemainingIn, receiptDecimals),
+      budgetRemainingOut: formatUnits(quote.budgetRemainingOut, quoteTokenDecimals),
+      budgetPressure: quote.budgetPressure,
     })),
     skippedMakers: skippedQuotes.map((quote) => ({
       maker: quote.maker,
       orderHash: quote.orderHash,
       deliverableOut: formatUnits(quote.deliverableOut, quoteTokenDecimals),
+      budgetId: quote.budgetId,
+      budgetRemainingIn: formatUnits(quote.budgetRemainingIn, receiptDecimals),
+      budgetRemainingOut: formatUnits(quote.budgetRemainingOut, quoteTokenDecimals),
+      budgetPressure: quote.budgetPressure,
       reason: quote.deliverableOut === 0n
-        ? 'No deliverable maker output after live wallet balance, allowance, and Aqua virtual balance checks.'
+        ? 'No deliverable maker output after live wallet balance, allowance, Aqua virtual balance, and shared term-risk budget checks.'
         : 'Skipped by route executor after executable-liquidity and maker policy checks.',
     })),
     execution: canExecute ? {
@@ -275,10 +304,21 @@ export async function buildMakerStrategy(options = {}) {
   const maxNotionalOutRaw = options.maxNotionalOut
     ? parsePositiveUnits(options.maxNotionalOut, quote.decimals, 'maxNotionalOut')
     : 0n
+  const budgetLabel = String(options.budgetLabel || `${receipt.underlyingSymbol}-${quote.symbol}-term-book`)
+  const budgetId = bytes32OrHash(options.budgetId, budgetLabel)
+  const budgetMaxExposureRaw = options.budgetMaxExposure
+    ? parsePositiveUnits(options.budgetMaxExposure, receipt.decimals, 'budgetMaxExposure')
+    : maxExposureRaw * 3n
+  const budgetMaxSpendRaw = options.budgetMaxSpend
+    ? parsePositiveUnits(options.budgetMaxSpend, quote.decimals, 'budgetMaxSpend')
+    : quoteLiquidityRaw * 3n
+  const budgetPressurePenaltyBps = toBps(options.budgetPressurePenaltyBps ?? percentToBps(options.budgetPressurePenaltyPct ?? 1), 'budgetPressurePenaltyBps')
 
   assertUint128(quoteLiquidityRaw, 'quoteLiquidity')
   assertUint128(maxExposureRaw, 'maxExposure')
   assertUint128(maxNotionalOutRaw, 'maxNotionalOut')
+  assertUint128(budgetMaxExposureRaw, 'budgetMaxExposure')
+  assertUint128(budgetMaxSpendRaw, 'budgetMaxSpend')
 
   const now = Math.floor(Date.now() / 1000)
   const maturity = Number(options.maturity || receipt.maturity)
@@ -419,6 +459,17 @@ export async function buildMakerStrategy(options = {}) {
       maxExposure: formatUnits(maxExposureRaw, receipt.decimals),
       maxNotionalOut: maxNotionalOutRaw === 0n ? 'unbounded' : formatUnits(maxNotionalOutRaw, quote.decimals),
     },
+    termRiskBudget: {
+      id: budgetId,
+      label: budgetLabel,
+      maxReceiptExposure: formatUnits(budgetMaxExposureRaw, receipt.decimals),
+      maxQuoteSpend: formatUnits(budgetMaxSpendRaw, quote.decimals),
+      maxReceiptExposureRaw: budgetMaxExposureRaw.toString(),
+      maxQuoteSpendRaw: budgetMaxSpendRaw.toString(),
+      pressurePenaltyBps: budgetPressurePenaltyBps,
+      receiptToken: tokenIn,
+      quoteToken: tokenOut,
+    },
   }
 }
 
@@ -454,6 +505,46 @@ export function decodeOrder(encodedOrder) {
   return order
 }
 
+function buildBudgetPressureMeta(quote, budget, receiptDecimals, quoteTokenDecimals) {
+  const zeroBudgetId = /^0x0{64}$/i
+  if (!budget || !quote.budgetId || zeroBudgetId.test(String(quote.budgetId))) return null
+
+  const maxReceiptExposureRaw = BigInt(budget.maxReceiptExposure ?? 0)
+  const maxQuoteSpendRaw = BigInt(budget.maxQuoteSpend ?? 0)
+  const budgetRemainingInRaw = quote.budgetRemainingIn
+  const budgetRemainingOutRaw = quote.budgetRemainingOut
+  const pressurePenaltyBps = Number(budget.pressurePenaltyBps ?? 0)
+
+  const receiptUsedRaw = maxReceiptExposureRaw > 0n && budgetRemainingInRaw < maxReceiptExposureRaw
+    ? maxReceiptExposureRaw - budgetRemainingInRaw
+    : 0n
+  const quoteUsedRaw = maxQuoteSpendRaw > 0n && budgetRemainingOutRaw < maxQuoteSpendRaw
+    ? maxQuoteSpendRaw - budgetRemainingOutRaw
+    : 0n
+
+  const receiptUtilizationBps = maxReceiptExposureRaw > 0n
+    ? Number((receiptUsedRaw * 10_000n) / maxReceiptExposureRaw)
+    : 0
+  const quoteUtilizationBps = maxQuoteSpendRaw > 0n
+    ? Number((quoteUsedRaw * 10_000n) / maxQuoteSpendRaw)
+    : 0
+  const utilizationBps = Math.min(Math.max(receiptUtilizationBps, quoteUtilizationBps), 10_000)
+  const activePressureBps = Math.min(Math.floor((pressurePenaltyBps * utilizationBps) / 10_000), 10_000)
+
+  return {
+    budgetId: budget.budgetId ?? quote.budgetId,
+    maxReceiptExposure: formatUnits(maxReceiptExposureRaw, receiptDecimals),
+    maxQuoteSpend: formatUnits(maxQuoteSpendRaw, quoteTokenDecimals),
+    receiptUsed: formatUnits(receiptUsedRaw, receiptDecimals),
+    quoteUsed: formatUnits(quoteUsedRaw, quoteTokenDecimals),
+    receiptUtilizationBps,
+    quoteUtilizationBps,
+    utilizationBps,
+    pressurePenaltyBps,
+    activePressureBps,
+  }
+}
+
 export function buildBestFirstPreview(candidates, requestedIn, receiptDecimals, quoteTokenDecimals) {
   const sorted = [...candidates].sort((a, b) => {
     const left = b.amountOut * a.fillIn
@@ -474,6 +565,10 @@ export function buildBestFirstPreview(candidates, requestedIn, receiptDecimals, 
       orderHash: quote.orderHash,
       fillIn: formatUnits(fillIn, receiptDecimals),
       estimatedGrossOut: formatUnits(amountOut, quoteTokenDecimals),
+      budgetId: quote.budgetId,
+      budgetRemainingIn: formatUnits(quote.budgetRemainingIn, receiptDecimals),
+      budgetRemainingOut: formatUnits(quote.budgetRemainingOut, quoteTokenDecimals),
+      budgetPressure: quote.budgetPressure,
     })
     remaining -= fillIn
   }
@@ -546,6 +641,11 @@ function riskTierBps(tier) {
   if (tier === 'conservative') return 25
   if (tier === 'aggressive') return 150
   return 75
+}
+
+function bytes32OrHash(value, fallbackLabel) {
+  if (typeof value === 'string' && /^0x[0-9a-fA-F]{64}$/u.test(value)) return value
+  return keccak256(toBytes(String(value || fallbackLabel)))
 }
 
 function concatHex(parts) {

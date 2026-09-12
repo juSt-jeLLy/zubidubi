@@ -87,6 +87,17 @@ export const PORTFOLIO_QUERY = /* GraphQL */ `
       quoteVirtualBalance
       exposureAmount
       quotePulledAmount
+      budget {
+        id
+        budgetId
+        maxReceiptExposure
+        maxQuoteSpend
+        receiptExposure
+        quoteSpent
+        pressurePenaltyBps
+        assignmentCount
+        fillCount
+      }
       createdAtBlock
       createdAtTimestamp
       updatedAtBlock

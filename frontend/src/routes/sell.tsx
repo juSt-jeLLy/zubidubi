@@ -35,7 +35,7 @@ import { useMarkets } from "@/services/markets/useMarkets";
 import { buildQuoteBenchmark } from "@/services/solver/benchmarks";
 import { requestRouteQuote } from "@/services/solver/client";
 import { executeRouteQuote } from "@/services/solver/execute";
-import type { SolverQuote, SolverQuoteError } from "@/services/solver/types";
+import type { BudgetPressureMeta, SolverQuote, SolverQuoteError } from "@/services/solver/types";
 import { getClaimPublicClient } from "@/services/portfolio/issueClaim";
 
 const searchSchema = z.object({ asset: z.string().optional() });
@@ -70,6 +70,11 @@ type MakerRow = {
   fillIn: string;
   amountOut: string;
   status: "filled" | "skipped";
+  budgetId?: string;
+  budgetRemainingIn?: string;
+  budgetRemainingOut?: string;
+  budgetPressure?: BudgetPressureMeta | null;
+  reason?: string;
 };
 
 function StatusBadge({ status }: { status: MakerRow["status"] }) {
@@ -85,6 +90,23 @@ function StatusBadge({ status }: { status: MakerRow["status"] }) {
       variant="outline"
     >
       <X className="size-3" /> Skipped
+    </Badge>
+  );
+}
+
+function BudgetPressureBadge({ pressure }: { pressure?: BudgetPressureMeta | null }) {
+  if (!pressure) return null;
+  const utilizationPct = pressure.utilizationBps / 100;
+  const activePressure = pressure.activePressureBps;
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "w-fit gap-1 border-primary/30 bg-primary/10 text-[11px] text-primary",
+        activePressure > 0 && "border-warning/40 bg-warning/10 text-warning",
+      )}
+    >
+      Budget {fmtNum(utilizationPct, 1)}% used · +{activePressure} bps pressure
     </Badge>
   );
 }
@@ -210,6 +232,10 @@ function SellPage() {
         fillIn: fill.fillIn,
         amountOut: fill.estimatedGrossOut,
         status: "filled" as const,
+        budgetId: fill.budgetId,
+        budgetRemainingIn: fill.budgetRemainingIn,
+        budgetRemainingOut: fill.budgetRemainingOut,
+        budgetPressure: fill.budgetPressure,
       })) ?? [];
     const skipped =
       quote?.skippedMakers.map((maker) => ({
@@ -218,6 +244,11 @@ function SellPage() {
         fillIn: "0",
         amountOut: "0",
         status: "skipped" as const,
+        budgetId: maker.budgetId,
+        budgetRemainingIn: maker.budgetRemainingIn,
+        budgetRemainingOut: maker.budgetRemainingOut,
+        budgetPressure: maker.budgetPressure,
+        reason: maker.reason,
       })) ?? [];
     return [...fills, ...skipped];
   }, [quote]);
@@ -537,30 +568,42 @@ function SellPage() {
                           <button
                             onClick={() => skipped && setFlipped(isFlipped ? null : f.maker)}
                             className={cn(
-                              "flex w-full items-center gap-3 rounded-md border border-border px-3 py-3 text-left text-sm",
+                              "grid w-full gap-3 rounded-md border border-border px-3 py-3 text-left text-sm lg:grid-cols-[130px_1fr_150px_120px] lg:items-center",
                               skipped
                                 ? "bg-surface-2/50 opacity-80 hover:opacity-100"
                                 : "bg-surface-2",
                             )}
                           >
-                            <span className="num w-32 shrink-0 truncate text-foreground">
-                              {shortAddress(f.maker)}
-                            </span>
-                            <span className="num hidden flex-1 text-muted-foreground sm:block">
-                              {skipped ? "--" : `${f.fillIn} ${market?.symbol}`}
-                            </span>
-                            <span className="num shrink-0 text-primary">
+                            <div className="min-w-0">
+                              <p className="num truncate text-foreground">{shortAddress(f.maker)}</p>
+                              <p className="num mt-0.5 truncate text-xs text-muted-foreground">
+                                {shortAddress(f.orderHash)}
+                              </p>
+                            </div>
+                            <div className="min-w-0 space-y-1">
+                              <p className="num text-muted-foreground">
+                                {skipped ? "--" : `${f.fillIn} ${market?.symbol}`}
+                              </p>
+                              <BudgetPressureBadge pressure={f.budgetPressure} />
+                              {f.budgetPressure ? (
+                                <p className="text-xs text-muted-foreground">
+                                  {fmtNum(Number(f.budgetRemainingIn ?? 0), 4)} input left /{" "}
+                                  {fmtNum(Number(f.budgetRemainingOut ?? 0), 4)} output left
+                                </p>
+                              ) : null}
+                            </div>
+                            <span className="num text-primary">
                               {skipped ? "--" : formatToken(f.amountOut, quoteSymbol, 4)}
                             </span>
-                            <span className="ml-auto shrink-0">
+                            <span className="shrink-0 justify-self-start lg:justify-self-end">
                               <StatusBadge status={f.status} />
                             </span>
                           </button>
                           {isFlipped && skipped && (
                             <p className="flip-in mt-1 flex gap-2 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-muted-foreground">
                               <ShieldAlert className="size-4 shrink-0 text-warning" />
-                              This maker was skipped because it could not contribute deliverable
-                              output for this route.
+                              {f.reason ??
+                                "This maker was skipped because it could not contribute deliverable output for this route."}
                             </p>
                           )}
                         </li>

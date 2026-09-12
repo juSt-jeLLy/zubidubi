@@ -70,6 +70,7 @@ type ZubiDubiStrategy @entity(immutable: false) {
   maker: Account!
   app: Bytes!
   orderHash: Bytes!
+  budget: TermRiskBudget
   market: Market
   strategyData: Bytes!
   status: StrategyStatus!
@@ -200,6 +201,50 @@ type MakerExposure @entity(immutable: false) {
   swapCount: BigInt!
   lastUpdatedBlock: BigInt!
   lastUpdatedTimestamp: BigInt!
+}
+
+type TermRiskBudget @entity(immutable: false) {
+  id: ID!
+  maker: Account!
+  budgetId: Bytes!
+  maxReceiptExposure: BigInt!
+  maxQuoteSpend: BigInt!
+  receiptExposure: BigInt!
+  quoteSpent: BigInt!
+  pressurePenaltyBps: BigInt!
+  assignmentCount: BigInt!
+  fillCount: BigInt!
+  lastUpdatedBlock: BigInt!
+  lastUpdatedTimestamp: BigInt!
+}
+
+type OrderBudgetAssignment @entity(immutable: false) {
+  id: ID!
+  orderHash: Bytes!
+  strategy: ZubiDubiStrategy
+  maker: Account!
+  budget: TermRiskBudget!
+  receiptToken: Token!
+  quoteToken: Token!
+  assignedAtBlock: BigInt!
+  assignedAtTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type TermRiskBudgetUse @entity(immutable: true) {
+  id: ID!
+  maker: Account!
+  budget: TermRiskBudget!
+  orderHash: Bytes!
+  strategy: ZubiDubiStrategy
+  fillIn: BigInt!
+  amountOut: BigInt!
+  receiptExposure: BigInt!
+  quoteSpent: BigInt!
+  transactionHash: Bytes!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  logIndex: BigInt!
 }
 
 enum StrategyStatus {

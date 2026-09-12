@@ -43,6 +43,11 @@ function shortHash(hash: string) {
   return hash ? `${hash.slice(0, 8)}...${hash.slice(-6)}` : "pending";
 }
 
+function pct(numerator: bigint, denominator: bigint) {
+  if (denominator <= 0n) return null;
+  return Math.min(100, Number((numerator * 10_000n) / denominator) / 100);
+}
+
 function mapStrategy(strategy: PortfolioGraphResponse["makerStrategies"][number]): MakerStrategyPosition {
   const receipt = strategy.market?.receiptToken ?? strategy.receiptToken;
   const quote = strategy.market?.quoteToken ?? strategy.quoteToken;
@@ -59,6 +64,13 @@ function mapStrategy(strategy: PortfolioGraphResponse["makerStrategies"][number]
       : exposure > 0n
         ? 100
         : 0;
+  const budget = strategy.budget;
+  const budgetReceiptUsagePct = budget
+    ? pct(asBigInt(budget.receiptExposure), asBigInt(budget.maxReceiptExposure))
+    : null;
+  const budgetQuoteUsagePct = budget
+    ? pct(asBigInt(budget.quoteSpent), asBigInt(budget.maxQuoteSpend))
+    : null;
 
   return {
     id: strategy.id,
@@ -73,6 +85,25 @@ function mapStrategy(strategy: PortfolioGraphResponse["makerStrategies"][number]
     exposure: tokenAmount(strategy.exposureAmount, receiptDecimals, receiptSymbol),
     quotePulled: tokenAmount(strategy.quotePulledAmount, quoteDecimals, quoteSymbol),
     exposurePct,
+    budgetId: budget?.budgetId ?? null,
+    budgetReceiptUsagePct,
+    budgetQuoteUsagePct,
+    budgetReceiptExposure: budget
+      ? `${tokenAmount(budget.receiptExposure, receiptDecimals, receiptSymbol)} / ${tokenAmount(
+          budget.maxReceiptExposure,
+          receiptDecimals,
+          receiptSymbol,
+        )}`
+      : null,
+    budgetQuoteSpent: budget
+      ? `${tokenAmount(budget.quoteSpent, quoteDecimals, quoteSymbol)} / ${tokenAmount(
+          budget.maxQuoteSpend,
+          quoteDecimals,
+          quoteSymbol,
+        )}`
+      : null,
+    budgetPressureBps: budget ? asNumber(budget.pressurePenaltyBps) : null,
+    budgetAssignmentCount: budget ? asNumber(budget.assignmentCount) : null,
     updatedAgo: timeAgo(asNumber(strategy.updatedAtTimestamp)),
   };
 }

@@ -132,5 +132,39 @@ export const MARKET_BOARD_QUERY = /* GraphQL */ `
       timestamp
       blockNumber
     }
+    termRiskBudgets(first: 20, orderBy: lastUpdatedTimestamp, orderDirection: desc) {
+      id
+      maker {
+        id
+      }
+      budgetId
+      maxReceiptExposure
+      maxQuoteSpend
+      receiptExposure
+      quoteSpent
+      pressurePenaltyBps
+      assignmentCount
+      fillCount
+      lastUpdatedBlock
+      lastUpdatedTimestamp
+    }
+    termRiskBudgetUses(first: 20, orderBy: timestamp, orderDirection: desc) {
+      id
+      maker {
+        id
+      }
+      budget {
+        id
+        budgetId
+      }
+      orderHash
+      fillIn
+      amountOut
+      receiptExposure
+      quoteSpent
+      transactionHash
+      blockNumber
+      timestamp
+    }
   }
 `;

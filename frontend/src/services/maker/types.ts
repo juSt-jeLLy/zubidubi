@@ -5,6 +5,11 @@ export type MakerStrategyBuildRequest = {
   quoteLiquidity: string;
   maxExposure: string;
   maxNotionalOut?: string;
+  budgetLabel?: string;
+  budgetId?: string;
+  budgetMaxExposure?: string;
+  budgetMaxSpend?: string;
+  budgetPressurePenaltyPct?: number;
   baseDiscountPct: number;
   annualRatePct: number;
   maxDiscountPct: number;
@@ -53,6 +58,17 @@ export type BuiltMakerStrategy = {
     quoteLiquidity: string;
     maxExposure: string;
     maxNotionalOut: string;
+  };
+  termRiskBudget?: {
+    id: `0x${string}`;
+    label: string;
+    maxReceiptExposure: string;
+    maxQuoteSpend: string;
+    maxReceiptExposureRaw: string;
+    maxQuoteSpendRaw: string;
+    pressurePenaltyBps: number;
+    receiptToken: `0x${string}`;
+    quoteToken: `0x${string}`;
   };
 };
 

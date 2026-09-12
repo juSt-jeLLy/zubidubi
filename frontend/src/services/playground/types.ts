@@ -1,5 +1,5 @@
 import type { LiveActivity, LiveMarket, MarketBoard } from "@/services/markets/types";
-import type { SolverQuote } from "@/services/solver/types";
+import type { BudgetPressureMeta, SolverQuote } from "@/services/solver/types";
 
 export type PlaygroundScenarioKind =
   | "fast-exit"
@@ -33,6 +33,10 @@ export type PlaygroundRouteRow = {
   grossOut: string;
   sharePct: number;
   status: "filled" | "skipped";
+  budgetId?: string;
+  budgetRemainingIn?: string;
+  budgetRemainingOut?: string;
+  budgetPressure?: BudgetPressureMeta | null;
   reason?: string;
 };
 

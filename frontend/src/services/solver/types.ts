@@ -1,15 +1,36 @@
+export type BudgetPressureMeta = {
+  budgetId: string;
+  maxReceiptExposure: string;
+  maxQuoteSpend: string;
+  receiptUsed: string;
+  quoteUsed: string;
+  receiptUtilizationBps: number;
+  quoteUtilizationBps: number;
+  utilizationBps: number;
+  pressurePenaltyBps: number;
+  activePressureBps: number;
+};
+
 export type SolverFill = {
   maker: string;
   orderHash: string;
   fillIn: string;
   amountOut: string;
   deliverableOut: string;
+  budgetId?: string;
+  budgetRemainingIn?: string;
+  budgetRemainingOut?: string;
+  budgetPressure?: BudgetPressureMeta | null;
 };
 
 export type SolverSkippedMaker = {
   maker: string;
   orderHash: string;
   deliverableOut?: string;
+  budgetId?: string;
+  budgetRemainingIn?: string;
+  budgetRemainingOut?: string;
+  budgetPressure?: BudgetPressureMeta | null;
   reason?: string;
 };
 
@@ -18,6 +39,10 @@ export type SolverRouteFill = {
   orderHash: string;
   fillIn: string;
   estimatedGrossOut: string;
+  budgetId?: string;
+  budgetRemainingIn?: string;
+  budgetRemainingOut?: string;
+  budgetPressure?: BudgetPressureMeta | null;
 };
 
 export type SolverQuote = {
