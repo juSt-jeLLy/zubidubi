@@ -28,6 +28,22 @@ function fmt(value: string | number, digits = 6) {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: digits }).format(parsed);
 }
 
+function BudgetPressureBadge({ row }: { row: PlaygroundRouteRow }) {
+  if (!row.budgetPressure) return null;
+  const activePressure = row.budgetPressure.activePressureBps;
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "mt-1 w-fit border-primary/30 bg-primary/10 text-[11px] text-primary",
+        activePressure > 0 && "border-warning/40 bg-warning/10 text-warning",
+      )}
+    >
+      {fmt(row.budgetPressure.utilizationBps / 100, 1)}% budget used · +{activePressure} bps pressure
+    </Badge>
+  );
+}
+
 function isSolverUnavailable(error: string | null) {
   if (!error) return false;
   const lower = error.toLowerCase();
@@ -168,9 +184,12 @@ export function RouteSplitPreview({
                       {short(row.orderHash)}
                     </p>
                     {row.budgetId && row.budgetId !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Budget {short(row.budgetId)} · {fmt(row.budgetRemainingIn ?? 0, 4)} in left / {fmt(row.budgetRemainingOut ?? 0, 4)} out left
-                      </p>
+                      <div className="mt-1 space-y-1">
+                        <p className="text-xs text-muted-foreground">
+                          Budget {short(row.budgetId)} · {fmt(row.budgetRemainingIn ?? 0, 4)} in left / {fmt(row.budgetRemainingOut ?? 0, 4)} out left
+                        </p>
+                        <BudgetPressureBadge row={row} />
+                      </div>
                     ) : null}
                   </div>
                   <p className="num text-muted-foreground">{skipped ? "--" : fmt(row.fillIn)}</p>
