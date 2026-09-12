@@ -147,35 +147,62 @@ This turns wallet-held Aqua liquidity into a coordinated term-liquidity book ins
 
 ## Architecture
 
-```text
-Holder wallet
-  |
-  | sells maturing claim
-  v
-ZubiDubiRouteExecutor
-  |
-  | quotes/splits candidate makers
-  v
-Shared term-risk budget layer
-  |
-  | caps global receipt/quote exposure and applies pressurePenaltyBps
-  v
-AquaSwapVMRouter + SwapVM instructions
-  |
-  | BACKING_ORACLE_CHECK -> EXPOSURE_CAP -> DISCOUNT_CURVE_1D
-  v
-Aqua settlement
-  |
-  | pulls maker USDC/WETH only if route is executable
-  v
-Maker wallets receive claims, seller receives liquid tokens, DAO fee accrues
+```mermaid
+sequenceDiagram
+    autonumber
 
-The Graph + Substreams
-  |
-  | index strategies, fills, maker exposure, receipt lifecycle, DAO fees
-  v
-Solver API + frontend
+    participant Maker as Maker
+    participant Seller as Seller
+    participant UI as ZubiDubi Frontend<br/>(Privy wallet)
+    participant Solver as Railway Solver API
+    participant Graph as The Graph<br/>Subgraph
+    participant Executor as ZubiDubiRouteExecutor
+    participant SwapVM as AquaSwapVMRouter<br/>+ SwapVM Instructions
+    participant Aqua as Aqua<br/>Maker Wallet Liquidity
+
+    rect rgb(20, 20, 20)
+        note over Maker,Aqua: Maker publishes self-custodial term-liquidity
+        Maker->>UI: Connect wallet with Privy
+        Maker->>Solver: Build strategy parameters<br/>asset, payout token, maturity, curve, risk limits
+        Solver-->>UI: Encoded SwapVM order bytes
+        Maker->>Aqua: approve quote token + Aqua.ship()
+        Maker->>Executor: optional setTermRiskBudget()<br/>shared exposure / quote-spend budget
+        Graph-->>Graph: Index strategy, budget, receipt market
+    end
+
+    rect rgb(20, 20, 20)
+        note over Maker,Aqua: Seller exits a delayed-redemption asset
+
+        Seller->>UI: Connect wallet with Privy
+        Seller->>UI: Choose maturing claim + amount<br/>ex: PT-zbETH-30D
+        UI->>Graph: Load live markets, strategies, budgets
+        Graph-->>UI: Active term-liquidity book
+
+        UI->>Solver: Request executable quote
+        Solver->>Graph: Fetch candidate Aqua strategies
+        Solver->>Executor: quoteExactIn(candidate orders)
+
+        Executor->>SwapVM: Quote each strategy
+        SwapVM-->>Executor: BACKING_ORACLE_CHECK<br/>EXPOSURE_CAP<br/>DISCOUNT_CURVE_1D
+
+        Executor->>Aqua: Check deliverable maker liquidity
+        Aqua-->>Executor: min(Aqua virtual balance,<br/>wallet balance, allowance)
+
+        Executor-->>Solver: Best route split<br/>skipped makers<br/>budget pressure<br/>minAmountOut
+        Solver-->>UI: Quote + route preview
+        UI-->>Seller: Show received USDC/WETH,<br/>maker split, discounts, pressure bps
+
+        Seller->>UI: Approve receipt token
+        Seller->>Executor: routeExactIn()
+        Executor->>Aqua: Pull USDC/WETH from maker wallets
+        Aqua-->>Seller: Seller receives liquid token
+        Aqua-->>Maker: Makers receive maturing claims
+        Executor-->>Graph: Emit routed fill, fee, skip, budget events
+        Graph-->>UI: Update markets, portfolio, maker exposure, DAO fees
+    end
 ```
+
+ZubiDubi turns delayed-redemption assets into a live term-liquidity book. Makers keep funds in their own wallets through Aqua, SwapVM prices each claim with reusable term-risk instructions, The Graph reconstructs the market, and the route executor only settles when liquidity is actually deliverable onchain.
 
 ## Live Sepolia Deployment
 
