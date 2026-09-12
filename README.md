@@ -141,6 +141,8 @@ ZubiDubi adds an explicit maker-level budget layer in `ZubiDubiRouteExecutor`:
 - `pressurePenaltyBps` applies a utilization-scaled quote haircut as the shared budget fills
 - the budget is indexed by The Graph and shown in maker portfolio, sell route previews, and playground proof views
 
+Each budget carries a `pressurePenaltyBps`. As a maker's shared budget fills up by receipt exposure or quote spend, whichever side is more utilized controls the pressure. That pressure scales up and reduces the payout on every fill drawing from the budget, including sibling strategies that have not filled yet. This makes the budget a repricing risk book, not only a shared spending cap.
+
 This turns wallet-held Aqua liquidity into a coordinated term-liquidity book instead of independent strategies racing the same maker balance.
 
 ## Architecture
@@ -153,6 +155,10 @@ Holder wallet
 ZubiDubiRouteExecutor
   |
   | quotes/splits candidate makers
+  v
+Shared term-risk budget layer
+  |
+  | caps global receipt/quote exposure and applies pressurePenaltyBps
   v
 AquaSwapVMRouter + SwapVM instructions
   |
@@ -316,6 +322,7 @@ The route executor suite includes shared-budget proofs:
 
 - sibling strategies assigned to one budget cannot collectively exceed the maker's global reserve
 - once one strategy fills, budget exposure/spend is consumed and the next sibling quote loses capacity
+- `test_ZubiDubiRouteExecutor_ExecutionConsumesSharedBudgetForFutureQuotes` proves pressure repricing directly: after shared-budget utilization rises, the same sibling route quotes the same input but returns less output (`pressuredOut < unpressuredOut`)
 - pressure repricing makes later sibling quotes worse as the shared budget becomes more utilized
 
 ### Invariants
