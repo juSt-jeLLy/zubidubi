@@ -8,16 +8,18 @@ import {
   encodePacked,
   formatUnits,
   http,
+  keccak256,
   parseAbi,
   parseUnits,
+  toBytes,
 } from 'viem'
 import { sepolia } from 'viem/chains'
 
-export const DEFAULT_SUBGRAPH_ENDPOINT = 'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.3'
+export const DEFAULT_SUBGRAPH_ENDPOINT = 'https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.4'
 export const DEFAULT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 const QUOTE_ABI = parseAbi([
-  'function quoteExactIn((address maker,uint256 traits,bytes data)[] orders,address tokenIn,address tokenOut,uint256 amountIn) view returns (uint256 totalIn,uint256 totalOut,(bytes32 orderHash,address maker,uint256 fillIn,uint256 amountOut,uint256 deliverableOut,bool skipped)[] quotes)',
+  'function quoteExactIn((address maker,uint256 traits,bytes data)[] orders,address tokenIn,address tokenOut,uint256 amountIn) view returns (uint256 totalIn,uint256 totalOut,(bytes32 orderHash,address maker,uint256 fillIn,uint256 amountOut,uint256 deliverableOut,bytes32 budgetId,uint256 budgetRemainingIn,uint256 budgetRemainingOut,bool skipped)[] quotes)',
 ])
 
 const ROUTER_ABI = parseAbi([
@@ -194,13 +196,19 @@ export async function quoteZubiDubiRoute(options = {}) {
       fillIn: formatUnits(quote.fillIn, receiptDecimals),
       amountOut: formatUnits(quote.amountOut, quoteTokenDecimals),
       deliverableOut: formatUnits(quote.deliverableOut, quoteTokenDecimals),
+      budgetId: quote.budgetId,
+      budgetRemainingIn: formatUnits(quote.budgetRemainingIn, receiptDecimals),
+      budgetRemainingOut: formatUnits(quote.budgetRemainingOut, quoteTokenDecimals),
     })),
     skippedMakers: skippedQuotes.map((quote) => ({
       maker: quote.maker,
       orderHash: quote.orderHash,
       deliverableOut: formatUnits(quote.deliverableOut, quoteTokenDecimals),
+      budgetId: quote.budgetId,
+      budgetRemainingIn: formatUnits(quote.budgetRemainingIn, receiptDecimals),
+      budgetRemainingOut: formatUnits(quote.budgetRemainingOut, quoteTokenDecimals),
       reason: quote.deliverableOut === 0n
-        ? 'No deliverable maker output after live wallet balance, allowance, and Aqua virtual balance checks.'
+        ? 'No deliverable maker output after live wallet balance, allowance, Aqua virtual balance, and shared term-risk budget checks.'
         : 'Skipped by route executor after executable-liquidity and maker policy checks.',
     })),
     execution: canExecute ? {
@@ -275,10 +283,21 @@ export async function buildMakerStrategy(options = {}) {
   const maxNotionalOutRaw = options.maxNotionalOut
     ? parsePositiveUnits(options.maxNotionalOut, quote.decimals, 'maxNotionalOut')
     : 0n
+  const budgetLabel = String(options.budgetLabel || `${receipt.underlyingSymbol}-${quote.symbol}-term-book`)
+  const budgetId = bytes32OrHash(options.budgetId, budgetLabel)
+  const budgetMaxExposureRaw = options.budgetMaxExposure
+    ? parsePositiveUnits(options.budgetMaxExposure, receipt.decimals, 'budgetMaxExposure')
+    : maxExposureRaw * 3n
+  const budgetMaxSpendRaw = options.budgetMaxSpend
+    ? parsePositiveUnits(options.budgetMaxSpend, quote.decimals, 'budgetMaxSpend')
+    : quoteLiquidityRaw * 3n
+  const budgetPressurePenaltyBps = toBps(options.budgetPressurePenaltyBps ?? percentToBps(options.budgetPressurePenaltyPct ?? 1), 'budgetPressurePenaltyBps')
 
   assertUint128(quoteLiquidityRaw, 'quoteLiquidity')
   assertUint128(maxExposureRaw, 'maxExposure')
   assertUint128(maxNotionalOutRaw, 'maxNotionalOut')
+  assertUint128(budgetMaxExposureRaw, 'budgetMaxExposure')
+  assertUint128(budgetMaxSpendRaw, 'budgetMaxSpend')
 
   const now = Math.floor(Date.now() / 1000)
   const maturity = Number(options.maturity || receipt.maturity)
@@ -419,6 +438,17 @@ export async function buildMakerStrategy(options = {}) {
       maxExposure: formatUnits(maxExposureRaw, receipt.decimals),
       maxNotionalOut: maxNotionalOutRaw === 0n ? 'unbounded' : formatUnits(maxNotionalOutRaw, quote.decimals),
     },
+    termRiskBudget: {
+      id: budgetId,
+      label: budgetLabel,
+      maxReceiptExposure: formatUnits(budgetMaxExposureRaw, receipt.decimals),
+      maxQuoteSpend: formatUnits(budgetMaxSpendRaw, quote.decimals),
+      maxReceiptExposureRaw: budgetMaxExposureRaw.toString(),
+      maxQuoteSpendRaw: budgetMaxSpendRaw.toString(),
+      pressurePenaltyBps: budgetPressurePenaltyBps,
+      receiptToken: tokenIn,
+      quoteToken: tokenOut,
+    },
   }
 }
 
@@ -474,6 +504,9 @@ export function buildBestFirstPreview(candidates, requestedIn, receiptDecimals, 
       orderHash: quote.orderHash,
       fillIn: formatUnits(fillIn, receiptDecimals),
       estimatedGrossOut: formatUnits(amountOut, quoteTokenDecimals),
+      budgetId: quote.budgetId,
+      budgetRemainingIn: formatUnits(quote.budgetRemainingIn, receiptDecimals),
+      budgetRemainingOut: formatUnits(quote.budgetRemainingOut, quoteTokenDecimals),
     })
     remaining -= fillIn
   }
@@ -546,6 +579,11 @@ function riskTierBps(tier) {
   if (tier === 'conservative') return 25
   if (tier === 'aggressive') return 150
   return 75
+}
+
+function bytes32OrHash(value, fallbackLabel) {
+  if (typeof value === 'string' && /^0x[0-9a-fA-F]{64}$/u.test(value)) return value
+  return keccak256(toBytes(String(value || fallbackLabel)))
 }
 
 function concatHex(parts) {

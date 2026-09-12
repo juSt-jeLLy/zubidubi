@@ -51,7 +51,7 @@ export const Route = createFileRoute("/make")({
   component: MakePage,
 });
 
-type ShipPhase = "idle" | "building" | "approving" | "shipping" | "shipped" | "error";
+type ShipPhase = "idle" | "building" | "approving" | "shipping" | "budgeting" | "shipped" | "error";
 type NumberFormKey = Extract<
   keyof MakeFormState,
   | "baseDiscountPct"
@@ -65,6 +65,9 @@ type NumberFormKey = Extract<
   | "maxExposure"
   | "quoteLiquidity"
   | "deviationPct"
+  | "budgetMaxExposure"
+  | "budgetMaxSpend"
+  | "budgetPressurePenaltyPct"
 >;
 
 function MakePage() {
@@ -157,6 +160,10 @@ function MakePage() {
         curveFamily: form.curveFamily,
         convexity: form.convexity,
         deviationPct: form.deviationPct,
+        budgetLabel: form.budgetLabel,
+        budgetMaxExposure: String(form.budgetMaxExposure),
+        budgetMaxSpend: String(form.budgetMaxSpend),
+        budgetPressurePenaltyPct: form.budgetPressurePenaltyPct,
       });
       setOrderHash(strategy.orderHash);
 
@@ -169,6 +176,9 @@ function MakePage() {
           setPhase("shipping");
           setShipHash(hash);
         },
+        onBudgetSubmitted: () => {
+          setPhase("budgeting");
+        },
       });
       setOrderHash(result.orderHash);
       setPhase("shipped");
@@ -180,7 +190,7 @@ function MakePage() {
     }
   }
 
-  const busy = ["building", "approving", "shipping"].includes(phase);
+  const busy = ["building", "approving", "shipping", "budgeting"].includes(phase);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
@@ -283,6 +293,19 @@ function MakePage() {
             <Field label={`Quote liquidity${market ? ` (${market.quoteSymbol})` : ""}`} value={String(form.quoteLiquidity)} set={setNumericField("quoteLiquidity")} />
             <Field label={`Max receipt exposure${market ? ` (${market.symbol})` : ""}`} value={String(form.maxExposure)} set={setNumericField("maxExposure")} />
             <Field label="Max notional out (optional)" value={form.maxNotionalOut} set={(value) => dispatch({ type: "set-text", key: "maxNotionalOut", value })} placeholder="Unbounded" />
+          </MakeSection>
+
+          <MakeSection title="Portfolio risk budget" defaultOpen={false}>
+            <div className="rounded-md border border-border bg-surface-2 p-3 text-xs">
+              <div className="font-semibold">Shared maker term-risk book</div>
+              <p className="mt-2 text-muted-foreground">
+                Strategies with the same budget label consume one global receipt exposure and quote-token spend limit. Sibling strategies lose capacity after any one fills.
+              </p>
+            </div>
+            <Field label="Budget label" value={form.budgetLabel} set={(value) => dispatch({ type: "set-text", key: "budgetLabel", value })} />
+            <Field label={`Global receipt exposure${market ? ` (${market.symbol})` : ""}`} value={String(form.budgetMaxExposure)} set={setNumericField("budgetMaxExposure")} />
+            <Field label={`Global quote spend${market ? ` (${market.quoteSymbol})` : ""}`} value={String(form.budgetMaxSpend)} set={setNumericField("budgetMaxSpend")} />
+            <SliderRow label="Budget pressure spread" value={form.budgetPressurePenaltyPct} set={setNumber("budgetPressurePenaltyPct")} min={0} max={5} step={0.1} suffix="%" />
           </MakeSection>
 
           <MakeSection title="Oracle safety" defaultOpen={false}>
@@ -415,6 +438,7 @@ function shipButtonLabel(phase: ShipPhase) {
   if (phase === "building") return "Building strategy…";
   if (phase === "approving") return "Approving quote liquidity…";
   if (phase === "shipping") return "Shipping strategy…";
+  if (phase === "budgeting") return "Registering shared risk budget…";
   if (phase === "shipped") return "Ship another strategy";
   return "Approve & ship strategy";
 }

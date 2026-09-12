@@ -5,7 +5,7 @@
   "scripts": {
     "codegen": "graph codegen",
     "build": "graph build",
-    "deploy:studio": "graph deploy ${SUBGRAPH_SLUG:-zubidubi} subgraph.yaml --version-label ${SUBGRAPH_VERSION:-v0.9.3}",
+    "deploy:studio": "graph deploy ${SUBGRAPH_SLUG:-zubidubi} subgraph.yaml --version-label ${SUBGRAPH_VERSION:-v0.9.4}",
     "query:live": "node scripts/query-live.mjs"
   },
   "devDependencies": {

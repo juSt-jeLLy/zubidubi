@@ -6,6 +6,8 @@ import type {
   GraphRouteFee,
   GraphRouteFill,
   GraphStrategySnapshot,
+  GraphTermRiskBudget,
+  GraphTermRiskBudgetUse,
   LiveActivity,
   LiveMarket,
   MarketBoard,
@@ -184,6 +186,30 @@ function activityFromFee(fee: GraphRouteFee): LiveActivity {
   };
 }
 
+function activityFromBudgetUse(use: GraphTermRiskBudgetUse): LiveActivity {
+  return {
+    id: `budget-use-${use.id}`,
+    kind: "strategy",
+    asset: "Risk budget",
+    text: `Shared budget consumed · maker ${shortAddress(use.maker.id)}`,
+    value: `order ${shortAddress(use.orderHash)}`,
+    ago: timeAgo(use.timestamp),
+    blockNumber: asNumber(use.blockNumber),
+  };
+}
+
+function activityFromBudget(budget: GraphTermRiskBudget): LiveActivity {
+  return {
+    id: `budget-${budget.id}`,
+    kind: "strategy",
+    asset: "Risk budget",
+    text: `Shared term-risk budget updated · maker ${shortAddress(budget.maker.id)}`,
+    value: `${asNumber(budget.assignmentCount)} linked strategies`,
+    ago: timeAgo(budget.lastUpdatedTimestamp),
+    blockNumber: asNumber(budget.lastUpdatedBlock),
+  };
+}
+
 export function mapMarketBoard(data: MarketBoardResponse): MarketBoard {
   const receiptsByToken = new Map(
     data.receiptAssets.map((receipt) => [receipt.token.id.toLowerCase(), receipt] as const),
@@ -210,6 +236,8 @@ export function mapMarketBoard(data: MarketBoardResponse): MarketBoard {
       .map(activityFromSnapshot)
       .filter((item): item is LiveActivity => Boolean(item)),
     ...data.routeFees.map(activityFromFee),
+    ...data.termRiskBudgetUses.map(activityFromBudgetUse),
+    ...data.termRiskBudgets.map(activityFromBudget),
   ]
     .sort((a, b) => b.blockNumber - a.blockNumber)
     .slice(0, 30);
@@ -224,5 +252,7 @@ export function mapMarketBoard(data: MarketBoardResponse): MarketBoard {
     activity,
     receiptAssets: data.receiptAssets,
     underlyingTokens,
+    termRiskBudgets: data.termRiskBudgets,
+    termRiskBudgetUses: data.termRiskBudgetUses,
   };
 }

@@ -1,4 +1,9 @@
-import type { GraphMarket, GraphReceiptAsset, GraphToken } from "@/services/markets/types";
+import type {
+  GraphMarket,
+  GraphReceiptAsset,
+  GraphTermRiskBudget,
+  GraphToken,
+} from "@/services/markets/types";
 
 export type PortfolioGraphStrategy = {
   id: string;
@@ -16,6 +21,18 @@ export type PortfolioGraphStrategy = {
   quoteVirtualBalance: string;
   exposureAmount: string;
   quotePulledAmount: string;
+  budget: Pick<
+    GraphTermRiskBudget,
+    | "id"
+    | "budgetId"
+    | "maxReceiptExposure"
+    | "maxQuoteSpend"
+    | "receiptExposure"
+    | "quoteSpent"
+    | "pressurePenaltyBps"
+    | "assignmentCount"
+    | "fillCount"
+  > | null;
   createdAtBlock: string;
   createdAtTimestamp: string;
   updatedAtBlock: string;
@@ -128,6 +145,13 @@ export type MakerStrategyPosition = {
   exposure: string;
   quotePulled: string;
   exposurePct: number;
+  budgetId: string | null;
+  budgetReceiptUsagePct: number | null;
+  budgetQuoteUsagePct: number | null;
+  budgetReceiptExposure: string | null;
+  budgetQuoteSpent: string | null;
+  budgetPressureBps: number | null;
+  budgetAssignmentCount: number | null;
   updatedAgo: string;
 };
 

@@ -167,6 +167,11 @@ export function RouteSplitPreview({
                     <p className="num mt-0.5 truncate text-xs text-muted-foreground">
                       {short(row.orderHash)}
                     </p>
+                    {row.budgetId && row.budgetId !== "0x0000000000000000000000000000000000000000000000000000000000000000" ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Budget {short(row.budgetId)} · {fmt(row.budgetRemainingIn ?? 0, 4)} in left / {fmt(row.budgetRemainingOut ?? 0, 4)} out left
+                      </p>
+                    ) : null}
                   </div>
                   <p className="num text-muted-foreground">{skipped ? "--" : fmt(row.fillIn)}</p>
                   <p className="num text-primary">{skipped ? "--" : fmt(row.grossOut)}</p>

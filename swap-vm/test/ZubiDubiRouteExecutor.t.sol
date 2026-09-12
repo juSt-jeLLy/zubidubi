@@ -412,6 +412,123 @@ contract ZubiDubiRouteExecutorTest is AquaSwapVMTest {
         assertEq(exitReceipt.balanceOf(makerA), 1 ether);
     }
 
+    function test_ZubiDubiRouteExecutor_SharedTermRiskBudgetCapsSiblingStrategies() public {
+        address maker = vm.addr(0xB006E7);
+        bytes32 budgetId = keccak256("eth-term-book");
+
+        ISwapVM.Order memory cheapOrder = _createExitOrderFor(
+            maker,
+            _buildAquaExitArgsWithExposure(25, 500, 500, uint40(block.timestamp + 30 days), 1 hours, 5 ether),
+            bytes32("budget-cheap")
+        );
+        ISwapVM.Order memory expensiveOrder = _createExitOrderFor(
+            maker,
+            _buildAquaExitArgsWithExposure(250, 1500, 600, uint40(block.timestamp + 180 days), 1 hours, 5 ether),
+            bytes32("budget-expensive")
+        );
+
+        bytes32 cheapHash = _shipExitOrderFor(maker, cheapOrder, 5 ether, 10_000 ether);
+        bytes32 expensiveHash = _shipExitOrderFor(maker, expensiveOrder, 5 ether, 10_000 ether);
+
+        vm.startPrank(maker);
+        routeExecutor.setTermRiskBudget(budgetId, uint128(1.25 ether), uint128(4_000 ether), 125);
+        routeExecutor.assignOrderTermRiskBudget(cheapHash, budgetId, address(exitReceipt), address(usdc));
+        routeExecutor.assignOrderTermRiskBudget(expensiveHash, budgetId, address(exitReceipt), address(usdc));
+        vm.stopPrank();
+
+        usdc.mint(maker, 10_000 ether);
+        exitReceipt.mint(seller, 2 ether);
+        vm.prank(seller);
+        exitReceipt.approve(address(routeExecutor), 2 ether);
+
+        ISwapVM.Order[] memory orders = new ISwapVM.Order[](2);
+        orders[0] = expensiveOrder;
+        orders[1] = cheapOrder;
+
+        (uint256 quotedIn,, ZubiDubiRouteExecutor.Quote[] memory quotes) = routeExecutor.quoteExactIn(
+            orders,
+            address(exitReceipt),
+            address(usdc),
+            2 ether
+        );
+
+        assertEq(quotedIn, 1.25 ether);
+        assertEq(quotes[1].budgetId, budgetId);
+        assertEq(quotes[1].budgetRemainingIn, 1.25 ether);
+        assertEq(quotes[1].fillIn, 1.25 ether);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ZubiDubiRouteExecutor.ZubiDubiRouteExecutorInsufficientFill.selector,
+                2 ether,
+                1.25 ether
+            )
+        );
+        vm.prank(seller);
+        routeExecutor.routeExactIn(
+            orders,
+            address(exitReceipt),
+            address(usdc),
+            2 ether,
+            0,
+            recipient
+        );
+    }
+
+    function test_ZubiDubiRouteExecutor_ExecutionConsumesSharedBudgetForFutureQuotes() public {
+        address maker = vm.addr(0xB006E8);
+        bytes32 budgetId = keccak256("usd-term-book");
+
+        ISwapVM.Order memory orderA = _createExitOrderFor(
+            maker,
+            _buildAquaExitArgsWithExposure(50, 600, 500, uint40(block.timestamp + 30 days), 1 hours, 5 ether),
+            bytes32("budget-a")
+        );
+        ISwapVM.Order memory orderB = _createExitOrderFor(
+            maker,
+            _buildAquaExitArgsWithExposure(100, 1200, 500, uint40(block.timestamp + 90 days), 1 hours, 5 ether),
+            bytes32("budget-b")
+        );
+
+        bytes32 orderHashA = _shipExitOrderFor(maker, orderA, 5 ether, 10_000 ether);
+        bytes32 orderHashB = _shipExitOrderFor(maker, orderB, 5 ether, 10_000 ether);
+
+        vm.startPrank(maker);
+        routeExecutor.setTermRiskBudget(budgetId, uint128(1.5 ether), uint128(10_000 ether), 100);
+        routeExecutor.assignOrderTermRiskBudget(orderHashA, budgetId, address(exitReceipt), address(usdc));
+        routeExecutor.assignOrderTermRiskBudget(orderHashB, budgetId, address(exitReceipt), address(usdc));
+        vm.stopPrank();
+
+        usdc.mint(maker, 10_000 ether);
+        exitReceipt.mint(seller, 2 ether);
+        vm.prank(seller);
+        exitReceipt.approve(address(routeExecutor), 2 ether);
+
+        ISwapVM.Order[] memory firstRoute = new ISwapVM.Order[](1);
+        firstRoute[0] = orderA;
+
+        vm.prank(seller);
+        routeExecutor.routeExactIn(firstRoute, address(exitReceipt), address(usdc), 1 ether, 0, recipient);
+
+        ZubiDubiRouteExecutor.TermRiskBudget memory budget = routeExecutor.termRiskBudgetOf(maker, budgetId);
+        assertEq(budget.receiptExposure, 1 ether);
+        assertGt(budget.quoteSpent, 0);
+
+        ISwapVM.Order[] memory siblingRoute = new ISwapVM.Order[](1);
+        siblingRoute[0] = orderB;
+
+        (uint256 quotedIn,, ZubiDubiRouteExecutor.Quote[] memory quotes) = routeExecutor.quoteExactIn(
+            siblingRoute,
+            address(exitReceipt),
+            address(usdc),
+            1 ether
+        );
+
+        assertEq(quotedIn, 0.5 ether);
+        assertEq(quotes[0].budgetRemainingIn, 0.5 ether);
+        assertEq(quotes[0].fillIn, 0.5 ether);
+    }
+
     function _buildAquaExitArgs(
         uint32 baseDiscountBps,
         uint32 annualRateBps,

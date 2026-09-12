@@ -190,6 +190,10 @@ function PlaygroundPage() {
               text="The Graph discovers candidates; contracts enforce live deliverability before settlement."
             />
             <ProofNote
+              title="Shared risk budget"
+              text="Sibling Aqua strategies can share one maker reserve, and a fill through one route reduces capacity across the rest."
+            />
+            <ProofNote
               title="Revenue path"
               text="The route executor pays the DAO/protocol fee as part of the fill."
             />

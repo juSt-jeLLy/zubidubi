@@ -1,4 +1,4 @@
-import { Anchor, PlusCircle } from "lucide-react";
+import { Anchor, Layers3, PlusCircle } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
 import { Badge } from "@/components/ui/badge";
@@ -63,6 +63,37 @@ export function StrategiesPanel({ strategies }: { strategies: MakerStrategyPosit
                     <p className="num text-sm text-success">{strategy.quotePulled}</p>
                   </div>
                 </div>
+
+                {strategy.budgetId ? (
+                  <div className="mt-4 rounded border border-border bg-surface-2/50 p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Layers3 className="size-4 text-primary" />
+                      <span className="text-xs font-semibold uppercase tracking-widest">
+                        Shared term-risk budget
+                      </span>
+                      <Badge variant="outline" className="ml-auto text-[10px] uppercase tracking-wider">
+                        {strategy.budgetAssignmentCount} linked
+                      </Badge>
+                    </div>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <BudgetMeter
+                        label="Receipt exposure"
+                        value={strategy.budgetReceiptUsagePct ?? 0}
+                        detail={strategy.budgetReceiptExposure ?? "0"}
+                      />
+                      <BudgetMeter
+                        label="Quote spend"
+                        value={strategy.budgetQuoteUsagePct ?? 0}
+                        detail={strategy.budgetQuoteSpent ?? "0"}
+                      />
+                    </div>
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      Budget {strategy.budgetId.slice(0, 10)}... caps sibling strategies before
+                      settlement. Pressure spread:{" "}
+                      <span className="num">{strategy.budgetPressureBps ?? 0} bps</span>.
+                    </p>
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
@@ -93,6 +124,19 @@ export function StrategiesPanel({ strategies }: { strategies: MakerStrategyPosit
           <Link to="/make">Create strategy</Link>
         </Button>
       </aside>
+    </div>
+  );
+}
+
+function BudgetMeter({ label, value, detail }: { label: string; value: number; detail: string }) {
+  return (
+    <div>
+      <div className="flex justify-between gap-3 text-xs text-muted-foreground">
+        <span>{label}</span>
+        <span className="num">{Math.round(value)}%</span>
+      </div>
+      <Progress value={value} className="mt-1.5 bg-background" />
+      <p className="num mt-1.5 text-xs">{detail}</p>
     </div>
   );
 }

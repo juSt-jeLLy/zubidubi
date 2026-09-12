@@ -26,7 +26,27 @@ contract ZubiDubiRouteExecutor is ITakerCallbacks {
         uint256 fillIn;
         uint256 amountOut;
         uint256 deliverableOut;
+        bytes32 budgetId;
+        uint256 budgetRemainingIn;
+        uint256 budgetRemainingOut;
         bool skipped;
+    }
+
+    struct TermRiskBudget {
+        uint128 maxReceiptExposure;
+        uint128 maxQuoteSpend;
+        uint128 receiptExposure;
+        uint128 quoteSpent;
+        uint32 pressurePenaltyBps;
+        bool exists;
+    }
+
+    struct TermRiskBudgetMembership {
+        address maker;
+        bytes32 budgetId;
+        address receiptToken;
+        address quoteToken;
+        bool active;
     }
 
     Aqua public immutable AQUA;
@@ -40,6 +60,9 @@ contract ZubiDubiRouteExecutor is ITakerCallbacks {
     error ZubiDubiRouteExecutorFeeTooHigh(uint16 feeBps);
     error ZubiDubiRouteExecutorInsufficientFill(uint256 requested, uint256 filled);
     error ZubiDubiRouteExecutorInsufficientOutput(uint256 minAmountOut, uint256 amountOut);
+    error ZubiDubiRouteExecutorBudgetMissing(address maker, bytes32 budgetId);
+    error ZubiDubiRouteExecutorBudgetLimitExceeded(bytes32 budgetId, uint256 receiptExposure, uint256 quoteSpent);
+    error ZubiDubiRouteExecutorBudgetOverflow();
 
     event ZubiDubiRouteFilled(
         address indexed taker,
@@ -53,6 +76,32 @@ contract ZubiDubiRouteExecutor is ITakerCallbacks {
 
     event ZubiDubiRouteFeePaid(address indexed feeRecipient, address indexed tokenOut, uint256 amount);
     event ZubiDubiMakerSkipped(bytes32 indexed orderHash, address indexed maker);
+    event ZubiDubiTermRiskBudgetSet(
+        address indexed maker,
+        bytes32 indexed budgetId,
+        uint128 maxReceiptExposure,
+        uint128 maxQuoteSpend,
+        uint32 pressurePenaltyBps
+    );
+    event ZubiDubiOrderBudgetAssigned(
+        bytes32 indexed orderHash,
+        address indexed maker,
+        bytes32 indexed budgetId,
+        address receiptToken,
+        address quoteToken
+    );
+    event ZubiDubiTermRiskBudgetUsed(
+        address indexed maker,
+        bytes32 indexed budgetId,
+        bytes32 indexed orderHash,
+        uint256 fillIn,
+        uint256 amountOut,
+        uint256 receiptExposure,
+        uint256 quoteSpent
+    );
+
+    mapping(bytes32 => TermRiskBudget) public termRiskBudgets;
+    mapping(bytes32 => TermRiskBudgetMembership) public termRiskBudgetMemberships;
 
     modifier onlySwapVM() {
         if (msg.sender != address(SWAPVM)) revert ZubiDubiRouteExecutorOnlySwapVM();
@@ -66,6 +115,57 @@ contract ZubiDubiRouteExecutor is ITakerCallbacks {
         feeRecipient = feeRecipient_;
         feeBps = feeBps_;
         maxFills = maxFills_;
+    }
+
+    function setTermRiskBudget(
+        bytes32 budgetId,
+        uint128 maxReceiptExposure,
+        uint128 maxQuoteSpend,
+        uint32 pressurePenaltyBps
+    ) external {
+        bytes32 key = _budgetKey(msg.sender, budgetId);
+        TermRiskBudget storage budget = termRiskBudgets[key];
+        budget.maxReceiptExposure = maxReceiptExposure;
+        budget.maxQuoteSpend = maxQuoteSpend;
+        budget.pressurePenaltyBps = pressurePenaltyBps;
+        budget.exists = true;
+
+        emit ZubiDubiTermRiskBudgetSet(
+            msg.sender,
+            budgetId,
+            maxReceiptExposure,
+            maxQuoteSpend,
+            pressurePenaltyBps
+        );
+    }
+
+    function assignOrderTermRiskBudget(
+        bytes32 orderHash,
+        bytes32 budgetId,
+        address receiptToken,
+        address quoteToken
+    ) external {
+        bytes32 key = _budgetKey(msg.sender, budgetId);
+        if (!termRiskBudgets[key].exists) {
+            revert ZubiDubiRouteExecutorBudgetMissing(msg.sender, budgetId);
+        }
+
+        termRiskBudgetMemberships[orderHash] = TermRiskBudgetMembership({
+            maker: msg.sender,
+            budgetId: budgetId,
+            receiptToken: receiptToken,
+            quoteToken: quoteToken,
+            active: true
+        });
+
+        emit ZubiDubiOrderBudgetAssigned(orderHash, msg.sender, budgetId, receiptToken, quoteToken);
+    }
+
+    function termRiskBudgetOf(
+        address maker,
+        bytes32 budgetId
+    ) external view returns (TermRiskBudget memory) {
+        return termRiskBudgets[_budgetKey(maker, budgetId)];
     }
 
     function quoteExactIn(
@@ -113,6 +213,7 @@ contract ZubiDubiRouteExecutor is ITakerCallbacks {
                 takerData
             );
             totalOut += executedOut;
+            _recordBudgetFill(fills[i].order, fills[i].orderHash, tokenIn, tokenOut, fills[i].amountIn, executedOut);
             executedFills++;
         }
 
@@ -183,7 +284,9 @@ contract ZubiDubiRouteExecutor is ITakerCallbacks {
                     tokenIn,
                     tokenOut,
                     remaining,
-                    _reservedOut(fills, fillCount, orders[i].maker)
+                    _reservedOut(fills, fillCount, orders[i].maker),
+                    _reservedBudgetIn(fills, fillCount, orders[i], tokenIn, tokenOut),
+                    _reservedBudgetOut(fills, fillCount, orders[i], tokenIn, tokenOut)
                 );
 
                 quotes[i] = candidateQuote;
@@ -218,11 +321,14 @@ contract ZubiDubiRouteExecutor is ITakerCallbacks {
         address tokenIn,
         address tokenOut,
         uint256 remaining,
-        uint256 reservedOut
+        uint256 reservedOut,
+        uint256 reservedBudgetIn,
+        uint256 reservedBudgetOut
     ) private view returns (Fill memory fill, Quote memory quote) {
         bytes32 orderHash = SWAPVM.hash(order);
         quote.orderHash = orderHash;
         quote.maker = order.maker;
+        TermRiskBudgetMembership memory membership = _activeMembership(order, orderHash, tokenIn, tokenOut);
 
         (, uint256 virtualOut) = AQUA.safeBalances(
             order.maker,
@@ -242,6 +348,22 @@ contract ZubiDubiRouteExecutor is ITakerCallbacks {
         quote.deliverableOut = grossDeliverableOut > reservedOut ? grossDeliverableOut - reservedOut : 0;
 
         uint256 maxIn = remaining;
+        if (membership.active) {
+            (uint256 budgetRemainingIn, uint256 budgetRemainingOut) = _remainingBudget(
+                order.maker,
+                membership.budgetId,
+                reservedBudgetIn,
+                reservedBudgetOut
+            );
+
+            quote.budgetId = membership.budgetId;
+            quote.budgetRemainingIn = budgetRemainingIn;
+            quote.budgetRemainingOut = budgetRemainingOut;
+
+            if (maxIn > budgetRemainingIn) maxIn = budgetRemainingIn;
+            if (quote.deliverableOut > budgetRemainingOut) quote.deliverableOut = budgetRemainingOut;
+        }
+
         if (maxIn == 0 || quote.deliverableOut == 0) {
             quote.skipped = true;
             return (fill, quote);
@@ -365,5 +487,154 @@ contract ZubiDubiRouteExecutor is ITakerCallbacks {
                 reserved += fills[i].amountOut;
             }
         }
+    }
+
+    function _reservedBudgetIn(
+        Fill[] memory fills,
+        uint256 fillCount,
+        ISwapVM.Order calldata order,
+        address tokenIn,
+        address tokenOut
+    ) private view returns (uint256 reserved) {
+        bytes32 orderHash = SWAPVM.hash(order);
+        TermRiskBudgetMembership memory membership = _activeMembership(order, orderHash, tokenIn, tokenOut);
+        if (!membership.active) return 0;
+
+        for (uint256 i = 0; i < fillCount; i++) {
+            bytes32 filledHash = fills[i].orderHash;
+            TermRiskBudgetMembership memory filledMembership = termRiskBudgetMemberships[filledHash];
+            if (
+                filledMembership.active &&
+                filledMembership.maker == order.maker &&
+                filledMembership.budgetId == membership.budgetId &&
+                filledMembership.receiptToken == tokenIn &&
+                filledMembership.quoteToken == tokenOut
+            ) {
+                reserved += fills[i].amountIn;
+            }
+        }
+    }
+
+    function _reservedBudgetOut(
+        Fill[] memory fills,
+        uint256 fillCount,
+        ISwapVM.Order calldata order,
+        address tokenIn,
+        address tokenOut
+    ) private view returns (uint256 reserved) {
+        bytes32 orderHash = SWAPVM.hash(order);
+        TermRiskBudgetMembership memory membership = _activeMembership(order, orderHash, tokenIn, tokenOut);
+        if (!membership.active) return 0;
+
+        for (uint256 i = 0; i < fillCount; i++) {
+            bytes32 filledHash = fills[i].orderHash;
+            TermRiskBudgetMembership memory filledMembership = termRiskBudgetMemberships[filledHash];
+            if (
+                filledMembership.active &&
+                filledMembership.maker == order.maker &&
+                filledMembership.budgetId == membership.budgetId &&
+                filledMembership.receiptToken == tokenIn &&
+                filledMembership.quoteToken == tokenOut
+            ) {
+                reserved += fills[i].amountOut;
+            }
+        }
+    }
+
+    function _activeMembership(
+        ISwapVM.Order calldata order,
+        bytes32 orderHash,
+        address tokenIn,
+        address tokenOut
+    ) private view returns (TermRiskBudgetMembership memory membership) {
+        membership = termRiskBudgetMemberships[orderHash];
+        if (
+            !membership.active ||
+            membership.maker != order.maker ||
+            membership.receiptToken != tokenIn ||
+            membership.quoteToken != tokenOut ||
+            !termRiskBudgets[_budgetKey(order.maker, membership.budgetId)].exists
+        ) {
+            membership.active = false;
+        }
+    }
+
+    function _remainingBudget(
+        address maker,
+        bytes32 budgetId,
+        uint256 reservedIn,
+        uint256 reservedOut
+    ) private view returns (uint256 remainingIn, uint256 remainingOut) {
+        TermRiskBudget memory budget = termRiskBudgets[_budgetKey(maker, budgetId)];
+
+        if (budget.maxReceiptExposure == 0) {
+            remainingIn = type(uint256).max;
+        } else if (uint256(budget.receiptExposure) + reservedIn < budget.maxReceiptExposure) {
+            remainingIn = uint256(budget.maxReceiptExposure) - uint256(budget.receiptExposure) - reservedIn;
+        }
+
+        if (budget.maxQuoteSpend == 0) {
+            remainingOut = type(uint256).max;
+        } else if (uint256(budget.quoteSpent) + reservedOut < budget.maxQuoteSpend) {
+            remainingOut = uint256(budget.maxQuoteSpend) - uint256(budget.quoteSpent) - reservedOut;
+        }
+    }
+
+    function _recordBudgetFill(
+        ISwapVM.Order memory order,
+        bytes32 orderHash,
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint256 amountOut
+    ) private {
+        TermRiskBudgetMembership memory membership = termRiskBudgetMemberships[orderHash];
+        if (
+            !membership.active ||
+            membership.maker != order.maker ||
+            membership.receiptToken != tokenIn ||
+            membership.quoteToken != tokenOut
+        ) {
+            return;
+        }
+
+        bytes32 key = _budgetKey(order.maker, membership.budgetId);
+        TermRiskBudget storage budget = termRiskBudgets[key];
+        if (!budget.exists) return;
+
+        if (amountIn > type(uint128).max || amountOut > type(uint128).max) {
+            revert ZubiDubiRouteExecutorBudgetOverflow();
+        }
+
+        uint256 receiptExposure = uint256(budget.receiptExposure) + amountIn;
+        uint256 quoteSpent = uint256(budget.quoteSpent) + amountOut;
+
+        if (
+            (budget.maxReceiptExposure != 0 && receiptExposure > budget.maxReceiptExposure) ||
+            (budget.maxQuoteSpend != 0 && quoteSpent > budget.maxQuoteSpend)
+        ) {
+            revert ZubiDubiRouteExecutorBudgetLimitExceeded(membership.budgetId, receiptExposure, quoteSpent);
+        }
+
+        if (receiptExposure > type(uint128).max || quoteSpent > type(uint128).max) {
+            revert ZubiDubiRouteExecutorBudgetOverflow();
+        }
+
+        budget.receiptExposure = uint128(receiptExposure);
+        budget.quoteSpent = uint128(quoteSpent);
+
+        emit ZubiDubiTermRiskBudgetUsed(
+            order.maker,
+            membership.budgetId,
+            orderHash,
+            amountIn,
+            amountOut,
+            receiptExposure,
+            quoteSpent
+        );
+    }
+
+    function _budgetKey(address maker, bytes32 budgetId) private pure returns (bytes32) {
+        return keccak256(abi.encode(maker, budgetId));
     }
 }

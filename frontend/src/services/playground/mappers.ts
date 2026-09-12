@@ -91,6 +91,9 @@ export function buildRouteRows(quote: SolverQuote | null): PlaygroundRouteRow[] 
       grossOut: fill.estimatedGrossOut,
       sharePct: gross > 0 ? (grossOut / gross) * 100 : 0,
       status: "filled" as const,
+      budgetId: fill.budgetId,
+      budgetRemainingIn: fill.budgetRemainingIn,
+      budgetRemainingOut: fill.budgetRemainingOut,
     };
   });
 
@@ -102,6 +105,9 @@ export function buildRouteRows(quote: SolverQuote | null): PlaygroundRouteRow[] 
     grossOut: "0",
     sharePct: 0,
     status: "skipped" as const,
+    budgetId: maker.budgetId,
+    budgetRemainingIn: maker.budgetRemainingIn,
+    budgetRemainingOut: maker.budgetRemainingOut,
     reason:
       maker.reason ??
       "Skipped by route executor because this maker could not contribute deliverable output for the route.",

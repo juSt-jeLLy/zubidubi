@@ -58,6 +58,34 @@
   },
   {
     "type": "function",
+    "name": "assignOrderTermRiskBudget",
+    "inputs": [
+      {
+        "name": "orderHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "budgetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "receiptToken",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "quoteToken",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "feeBps",
     "inputs": [],
     "outputs": [
@@ -275,6 +303,21 @@
             "internalType": "uint256"
           },
           {
+            "name": "budgetId",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "budgetRemainingIn",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "budgetRemainingOut",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
             "name": "skipped",
             "type": "bool",
             "internalType": "bool"
@@ -351,6 +394,173 @@
     "stateMutability": "nonpayable"
   },
   {
+    "type": "function",
+    "name": "setTermRiskBudget",
+    "inputs": [
+      {
+        "name": "budgetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "maxReceiptExposure",
+        "type": "uint128",
+        "internalType": "uint128"
+      },
+      {
+        "name": "maxQuoteSpend",
+        "type": "uint128",
+        "internalType": "uint128"
+      },
+      {
+        "name": "pressurePenaltyBps",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "termRiskBudgetMemberships",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "maker",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "budgetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "receiptToken",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "quoteToken",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "active",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "termRiskBudgetOf",
+    "inputs": [
+      {
+        "name": "maker",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "budgetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct ZubiDubiRouteExecutor.TermRiskBudget",
+        "components": [
+          {
+            "name": "maxReceiptExposure",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
+            "name": "maxQuoteSpend",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
+            "name": "receiptExposure",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
+            "name": "quoteSpent",
+            "type": "uint128",
+            "internalType": "uint128"
+          },
+          {
+            "name": "pressurePenaltyBps",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "exists",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "termRiskBudgets",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "maxReceiptExposure",
+        "type": "uint128",
+        "internalType": "uint128"
+      },
+      {
+        "name": "maxQuoteSpend",
+        "type": "uint128",
+        "internalType": "uint128"
+      },
+      {
+        "name": "receiptExposure",
+        "type": "uint128",
+        "internalType": "uint128"
+      },
+      {
+        "name": "quoteSpent",
+        "type": "uint128",
+        "internalType": "uint128"
+      },
+      {
+        "name": "pressurePenaltyBps",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "exists",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
     "type": "event",
     "name": "ZubiDubiMakerSkipped",
     "inputs": [
@@ -364,6 +574,43 @@
         "name": "maker",
         "type": "address",
         "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ZubiDubiOrderBudgetAssigned",
+    "inputs": [
+      {
+        "name": "orderHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "maker",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "budgetId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "receiptToken",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "quoteToken",
+        "type": "address",
+        "indexed": false,
         "internalType": "address"
       }
     ],
@@ -444,6 +691,92 @@
     "anonymous": false
   },
   {
+    "type": "event",
+    "name": "ZubiDubiTermRiskBudgetSet",
+    "inputs": [
+      {
+        "name": "maker",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "budgetId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "maxReceiptExposure",
+        "type": "uint128",
+        "indexed": false,
+        "internalType": "uint128"
+      },
+      {
+        "name": "maxQuoteSpend",
+        "type": "uint128",
+        "indexed": false,
+        "internalType": "uint128"
+      },
+      {
+        "name": "pressurePenaltyBps",
+        "type": "uint32",
+        "indexed": false,
+        "internalType": "uint32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ZubiDubiTermRiskBudgetUsed",
+    "inputs": [
+      {
+        "name": "maker",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "budgetId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "orderHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "fillIn",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "amountOut",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "receiptExposure",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "quoteSpent",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
     "type": "error",
     "name": "SafeCastOverflowedUintDowncast",
     "inputs": [
@@ -490,6 +823,48 @@
         "internalType": "bytes"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "ZubiDubiRouteExecutorBudgetLimitExceeded",
+    "inputs": [
+      {
+        "name": "budgetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "receiptExposure",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "quoteSpent",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ZubiDubiRouteExecutorBudgetMissing",
+    "inputs": [
+      {
+        "name": "maker",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "budgetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ZubiDubiRouteExecutorBudgetOverflow",
+    "inputs": []
   },
   {
     "type": "error",

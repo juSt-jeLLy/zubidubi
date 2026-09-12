@@ -4,12 +4,18 @@ export type SolverFill = {
   fillIn: string;
   amountOut: string;
   deliverableOut: string;
+  budgetId?: string;
+  budgetRemainingIn?: string;
+  budgetRemainingOut?: string;
 };
 
 export type SolverSkippedMaker = {
   maker: string;
   orderHash: string;
   deliverableOut?: string;
+  budgetId?: string;
+  budgetRemainingIn?: string;
+  budgetRemainingOut?: string;
   reason?: string;
 };
 
@@ -18,6 +24,9 @@ export type SolverRouteFill = {
   orderHash: string;
   fillIn: string;
   estimatedGrossOut: string;
+  budgetId?: string;
+  budgetRemainingIn?: string;
+  budgetRemainingOut?: string;
 };
 
 export type SolverQuote = {

@@ -10,6 +10,7 @@ ZubiDubi is built on **Aqua** and **SwapVM**:
 - SwapVM executes reusable term-liquidity instructions for oracle backing, exposure caps, and maturity-aware discount curves.
 - The Graph reconstructs the live market book for discovery.
 - The route executor verifies real deliverable liquidity onchain before any fill can happen.
+- Shared term-risk budgets let one maker reserve coordinate sibling Aqua strategies, so the first fill reduces capacity across the rest of the maker's book.
 
 ## The Problem
 
@@ -127,6 +128,20 @@ Makers are skipped when:
 - their oracle is stale
 - their maturity or asset pair is outside the maker's policy
 
+### 5. Shared Term-Risk Budgets
+
+Aqua makes it possible for one wallet balance to quote many strategies, but that also creates a coordination problem: sibling strategies can all believe the same reserve is available until one of them fills.
+
+ZubiDubi adds an explicit maker-level budget layer in `ZubiDubiRouteExecutor`:
+
+- a maker creates a `budgetId` with max receipt exposure and max quote-token spend
+- multiple Aqua strategies can be assigned to that same budget
+- quotes are capped by the remaining global receipt and quote budget
+- execution consumes the budget immediately, so sibling strategies lose capacity in future quotes
+- the budget is indexed by The Graph and shown in maker portfolio and playground proof views
+
+This turns wallet-held Aqua liquidity into a coordinated term-liquidity book instead of independent strategies racing the same maker balance.
+
 ## Architecture
 
 ```text
@@ -161,10 +176,10 @@ Solver API + frontend
 | --- | --- | --- |
 | Aqua | `0x30aefbDE9EC52A23E597e338F02f35Da909D7183` | shared liquidity settlement |
 | AquaSwapVMRouter | `0x3d39B155De93CB9C340577E06b801C4956ed2a57` | modified router with reusable term-liquidity instructions |
-| ZubiDubiRouteExecutor | `0x95d74BF2a83bc3ba50dc5c377cE8fB1478Ae5708` | route splitting, deliverability checks, DAO fee |
+| ZubiDubiRouteExecutor | `0x5b9f90FDe93d0284A3a937078D6DDEF678816127` | route splitting, deliverability checks, DAO fee, shared term-risk budgets |
 | Original PT-zbETH receipt | `0xb7877571932A025E03a7B9616F254B361FD1759F` | WETH-backed receipt |
 | Pyth ETH/USD adapter | `0xE5179Bf17673A8Ab717F941a5A5BfedE64a2a2a4` | optional dual-oracle path |
-| Subgraph endpoint | `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.3` | live indexed market book |
+| Subgraph endpoint | `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.4` | live indexed market book |
 
 Public Sepolia maturing assets use real Sepolia tokens and real Chainlink feeds:
 
@@ -182,6 +197,15 @@ All market config is in:
 ```text
 config/zubidubi-markets.json
 ```
+
+Live shared term-risk budget proof:
+
+- Budget-aware executor: `0x5b9f90FDe93d0284A3a937078D6DDEF678816127`
+- Budget ID: `0x25df91de3b0b88921665b1290762b8328e4239985cab7fb629b0d44fb642012a`
+- Budget setup tx: `0x6e5834b0de0631053de4c826f74004ef4e2ef4abe4ba25cecf96e1975f9e7815`
+- Assigned sibling strategies: `PT-zbETH-30D/USDC` and `PT-zbETH-180D/USDC`
+- Indexed by Subgraph Studio `v0.9.4` with `assignmentCount = 2`
+- Solver quote now returns budget fields: `budgetRemainingIn = 0.006`, `budgetRemainingOut = 50`
 
 ## Repository Map
 
@@ -226,7 +250,7 @@ config/zubidubi-markets.json
 | `subgraph/schema.graphql` | standardized market, strategy, fill, exposure, fee and receipt entities |
 | `subgraph/src/aqua.ts` | indexes Aqua ship/push/pull/dock lifecycle |
 | `subgraph/src/router.ts` | indexes SwapVM fill events |
-| `subgraph/src/route-executor.ts` | indexes routed fills, maker skips and DAO fees |
+| `subgraph/src/route-executor.ts` | indexes routed fills, maker skips, DAO fees and shared term-risk budgets |
 | `subgraph/src/receipt.ts` | indexes receipt issue/redeem lifecycle |
 | `subgraph/queries/solver.graphql` | query shape consumed by solver |
 | `subgraph/STANDARDIZATION.md` | explanation of Graph standardization and composability |
@@ -270,9 +294,9 @@ The frontend is not static. It uses the same live systems as the contracts and s
 | --- | --- |
 | `/markets` | reads Subgraph Studio market data every 15 seconds |
 | `/sell` | asks solver API for fresh route quote, blocks if insufficient liquidity, executes `approve` + `routeExactIn` |
-| `/make` | builds encoded SwapVM strategy via `POST /strategies/build`, then executes `approve(quoteToken -> Aqua)` + `Aqua.ship(...)` |
-| `/portfolio` | reads wallet receipt balances from contracts, maker strategies and routes from The Graph, submits real `issue()` and `redeem()` |
-| `/playground` | deployable judge cockpit with live Graph markets, solver quotes, route split previews, skipped-maker reasons, protocol proof timeline, activity tape, main proof catalog, copyable commands, GitHub proof links, latest proof status, and visual test map for curve, routing, guardrail, receipt, fork, and indexing tests |
+| `/make` | builds encoded SwapVM strategy via `POST /strategies/build`, then executes `approve(quoteToken -> Aqua)`, `Aqua.ship(...)`, and optional shared term-risk budget registration |
+| `/portfolio` | reads wallet receipt balances from contracts, maker strategies, shared budgets and routes from The Graph, submits real `issue()` and `redeem()` |
+| `/playground` | deployable judge cockpit with live Graph markets, solver quotes, route split previews, budget/skip reasons, protocol proof timeline, activity tape, main proof catalog, copyable commands, GitHub proof links, latest proof status, and visual test map for curve, routing, guardrail, receipt, fork, and indexing tests |
 
 ## Tests and Proofs
 
@@ -285,6 +309,11 @@ forge test --match-contract ZubiDubiRouteExecutorTest -vv
 forge test --match-contract ZubiDubiDemoTest -vv
 forge test --match-contract ZubiDubiExitReceiptTest -vv
 ```
+
+The route executor suite includes shared-budget proofs:
+
+- sibling strategies assigned to one budget cannot collectively exceed the maker's global reserve
+- once one strategy fills, budget exposure/spend is consumed and the next sibling quote loses capacity
 
 ### Invariants
 
@@ -390,7 +419,7 @@ Required for local frontend:
 
 ```text
 VITE_PRIVY_APP_ID=
-VITE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.3
+VITE_SUBGRAPH_URL=https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.4
 VITE_SOLVER_API_URL=http://localhost:8787
 ```
 
@@ -412,6 +441,7 @@ ZubiDubi is not a generic DeFi dashboard. It uses the core ideas of Aqua and Swa
 - **Aqua strategy:** wallet-held maker liquidity, virtually tracked across many term-liquidity strategies.
 - **SwapVM instructions:** reusable executable logic for oracle backing, exposure caps, and maturity curves.
 - **Onchain execution:** token transfers happen onchain through Aqua and `ZubiDubiRouteExecutor`.
+- **Shared budget coordination:** sibling maker strategies can share one global term-risk budget rather than racing the same wallet liquidity independently.
 - **Modified SwapVM contracts allowed:** the router is modified and redeployed to support the new instruction library.
 - **Revenue path:** each routed fill pays a DAO/protocol fee from output proceeds.
 - **Live proof:** real Sepolia transfers, real Chainlink feeds, real maturing receipt contracts, and a real Pendle PT mainnet fork.

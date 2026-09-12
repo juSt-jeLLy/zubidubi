@@ -4,11 +4,15 @@ export type MakeFormState = MakerCurveParams & {
   quoteLiquidity: number;
   maxExposure: number;
   maxNotionalOut: string;
+  budgetLabel: string;
+  budgetMaxExposure: number;
+  budgetMaxSpend: number;
+  budgetPressurePenaltyPct: number;
 };
 
 export type MakeFormAction =
-  | { type: "set-number"; key: keyof Pick<MakeFormState, "baseDiscountPct" | "annualRatePct" | "maxDiscountPct" | "convexity" | "minDays" | "maxDays" | "inventorySlopePct" | "liquiditySlopePct" | "maxExposure" | "quoteLiquidity" | "deviationPct">; value: number }
-  | { type: "set-text"; key: "maxNotionalOut"; value: string }
+  | { type: "set-number"; key: keyof Pick<MakeFormState, "baseDiscountPct" | "annualRatePct" | "maxDiscountPct" | "convexity" | "minDays" | "maxDays" | "inventorySlopePct" | "liquiditySlopePct" | "maxExposure" | "quoteLiquidity" | "deviationPct" | "budgetMaxExposure" | "budgetMaxSpend" | "budgetPressurePenaltyPct">; value: number }
+  | { type: "set-text"; key: "maxNotionalOut" | "budgetLabel"; value: string }
   | { type: "set-risk"; value: MakeFormState["riskTier"] }
   | { type: "set-curve-family"; value: MakeFormState["curveFamily"] }
   | { type: "reset-market"; quoteLiquidity: number; maxExposure: number; maxDays?: number };
@@ -25,6 +29,10 @@ export const initialMakeFormState: MakeFormState = {
   quoteLiquidity: 25,
   maxExposure: 1,
   maxNotionalOut: "",
+  budgetLabel: "ETH-term-book",
+  budgetMaxExposure: 0.09,
+  budgetMaxSpend: 75,
+  budgetPressurePenaltyPct: 1,
   inventorySlopePct: 1.5,
   liquiditySlopePct: 0.6,
   deviationPct: 0,
@@ -49,6 +57,9 @@ function sanitize(state: MakeFormState): MakeFormState {
     maxExposure: Math.max(0.000001, state.maxExposure),
     quoteLiquidity: Math.max(0.000001, state.quoteLiquidity),
     deviationPct: clamp(state.deviationPct, 0, 10),
+    budgetMaxExposure: Math.max(0.000001, state.budgetMaxExposure),
+    budgetMaxSpend: Math.max(0.000001, state.budgetMaxSpend),
+    budgetPressurePenaltyPct: clamp(state.budgetPressurePenaltyPct, 0, 10),
   };
 }
 
@@ -74,6 +85,9 @@ export function makeFormReducer(state: MakeFormState, action: MakeFormAction): M
       ...state,
       quoteLiquidity: action.quoteLiquidity,
       maxExposure: action.maxExposure,
+      budgetLabel: state.budgetLabel || "term-risk-book",
+      budgetMaxExposure: Math.max(action.maxExposure * 3, state.budgetMaxExposure),
+      budgetMaxSpend: Math.max(action.quoteLiquidity * 3, state.budgetMaxSpend),
       maxNotionalOut: "",
       maxDays: action.maxDays ?? state.maxDays,
     });

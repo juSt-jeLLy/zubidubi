@@ -33,6 +33,9 @@ export type PlaygroundRouteRow = {
   grossOut: string;
   sharePct: number;
   status: "filled" | "skipped";
+  budgetId?: string;
+  budgetRemainingIn?: string;
+  budgetRemainingOut?: string;
   reason?: string;
 };
 

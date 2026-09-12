@@ -25,9 +25,9 @@ npx graph auth <DEPLOY_KEY>
 npm run deploy:studio
 ```
 
-Live Studio endpoint (v0.9.3, current):
+Live Studio endpoint (v0.9.4, current):
 
-`https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.3`
+`https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.4`
 
 Run a live provider query:
 
@@ -43,16 +43,16 @@ npm run zubidubi:graph-quote
 
 That command queries active strategies from this live subgraph, decodes the indexed SwapVM order bytes, and calls the Sepolia `ZubiDubiRouteExecutor.quoteExactIn` function for final deliverability-aware route pricing.
 
-## Live Sepolia Contracts (fixed-convexity curve-family stack)
+## Live Sepolia Contracts (budget-aware route executor stack)
 
 - Aqua: `0x30aefbDE9EC52A23E597e338F02f35Da909D7183`
 - AquaSwapVMRouter: `0x3d39B155De93CB9C340577E06b801C4956ed2a57`
-- ZubiDubiRouteExecutor: `0x95d74BF2a83bc3ba50dc5c377cE8fB1478Ae5708`
+- ZubiDubiRouteExecutor: `0x5b9f90FDe93d0284A3a937078D6DDEF678816127`
 - ZubiDubiExitReceipt: `0xb7877571932A025E03a7B9616F254B361FD1759F`
 - Pyth ETH/USD adapter: `0xE5179Bf17673A8Ab717F941a5A5BfedE64a2a2a4`
 - Core start block: `11677683` (current multi-asset term-book deployment window)
 
-Current PT-style Sepolia receipts indexed by v0.9.3:
+Current PT-style Sepolia receipts indexed by v0.9.4:
 
 | Asset | Address | Start block | Backing |
 | --- | --- | --- | --- |
@@ -67,10 +67,10 @@ Current PT-style Sepolia receipts indexed by v0.9.3:
 
 - Deploy AquaSwapVMRouter: `0x240535fd3b5c42087a84aedc0a515ee99f3b02a4b8d211d0809236880dbdd4ba`
 - Deploy ZubiDubiExitReceipt: `0x9453d2362987b4bb39bbdc510f5489079244acbe61d7e68865ee6e8c2874adb5`
-- Deploy ZubiDubiRouteExecutor: `0x32be16feff1d92c133346bf109836a5fc2364a90805e4ef9a12d5541e48b1e71`
+- Deploy ZubiDubiRouteExecutor: `0x9a9cd161fdcd37fd61325ca01933464a45b117f456bc6a1e47fb633f263c4e2b`
 - Routed fill (convex curve): `0x77518aa105405c1986fd2499f414285ac6ba62f2f7fc10542953f74dbdb46da7`
 
-The v0.9.3 subgraph indexes the hardened core stack plus the live multi-asset Sepolia term book: WETH-, USDC-, and LINK-backed receipts, USDC/WETH payouts, routed fills, DAO fee accrual, receipt issuance, and executable order bytes for the Graph-backed solver. Studio versions v0.6.0/v0.6.1 (indexing_error), v0.8.1 (burned mapping), and v0.8.2 (old WETH-only buckets) are inert; v0.9.3 is the current production query target. Deleting a Studio version label is a dashboard action (Studio -> Deployments -> kebab menu -> Delete); the graph CLI exposes no per-version removal.
+The v0.9.4 subgraph indexes the hardened core stack plus the live multi-asset Sepolia term book: WETH-, USDC-, and LINK-backed receipts, USDC/WETH payouts, routed fills, DAO fee accrual, receipt issuance, executable order bytes, and shared term-risk budget setup/use events for the Graph-backed solver. Studio versions v0.6.0/v0.6.1 (indexing_error), v0.8.1 (burned mapping), and v0.8.2 (old WETH-only buckets) are inert; v0.9.4 is the current production query target. Deleting a Studio version label is a dashboard action (Studio -> Deployments -> kebab menu -> Delete); the graph CLI exposes no per-version removal.
 
 ## Where This Improves ZubiDubi
 
