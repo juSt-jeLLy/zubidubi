@@ -181,11 +181,11 @@ Solver API + frontend
 
 | Component | Address | Purpose |
 | --- | --- | --- |
-| Aqua | `0x30aefbDE9EC52A23E597e338F02f35Da909D7183` | shared liquidity settlement |
-| AquaSwapVMRouter | `0x3d39B155De93CB9C340577E06b801C4956ed2a57` | modified router with reusable term-liquidity instructions |
-| ZubiDubiRouteExecutor | `0x99488C09A54092Aa3C7e725137B45f3612CC5be1` | route splitting, deliverability checks, DAO fee, shared term-risk budgets |
-| Original PT-zbETH receipt | `0xb7877571932A025E03a7B9616F254B361FD1759F` | WETH-backed receipt |
-| Pyth ETH/USD adapter | `0xE5179Bf17673A8Ab717F941a5A5BfedE64a2a2a4` | optional dual-oracle path |
+| Aqua | [`0x30aefbDE9EC52A23E597e338F02f35Da909D7183`](https://sepolia.etherscan.io/address/0x30aefbDE9EC52A23E597e338F02f35Da909D7183) | shared liquidity settlement |
+| AquaSwapVMRouter | [`0x3d39B155De93CB9C340577E06b801C4956ed2a57`](https://sepolia.etherscan.io/address/0x3d39B155De93CB9C340577E06b801C4956ed2a57) | modified router with reusable term-liquidity instructions |
+| ZubiDubiRouteExecutor | [`0x99488C09A54092Aa3C7e725137B45f3612CC5be1`](https://sepolia.etherscan.io/address/0x99488C09A54092Aa3C7e725137B45f3612CC5be1) | route splitting, deliverability checks, DAO fee, shared term-risk budgets |
+| Original PT-zbETH receipt | [`0xb7877571932A025E03a7B9616F254B361FD1759F`](https://sepolia.etherscan.io/address/0xb7877571932A025E03a7B9616F254B361FD1759F) | WETH-backed receipt |
+| Pyth ETH/USD adapter | [`0xE5179Bf17673A8Ab717F941a5A5BfedE64a2a2a4`](https://sepolia.etherscan.io/address/0xE5179Bf17673A8Ab717F941a5A5BfedE64a2a2a4) | optional dual-oracle path |
 | Subgraph endpoint | `https://api.studio.thegraph.com/query/1760034/zubidubi/v0.9.6` | live indexed market book |
 | Solver API | `https://api-production-105bb.up.railway.app` | hosted Railway quote/build API |
 | Frontend | `https://frontend-gamma-jade-96.vercel.app` | production Vercel app |
@@ -194,12 +194,12 @@ Public Sepolia maturing assets use real Sepolia tokens and real Chainlink feeds:
 
 | Asset | Address | Backing | Maturity | Live payout routes |
 | --- | --- | --- | --- | --- |
-| PT-zbETH-30D | `0xc53C8D1fFBbb502E1a9004a93Ea33Adc2039F513` | WETH 1:1 | 2026-10-10 | USDC, WETH |
-| PT-zbETH-180D | `0x4Ef8c0e1a313dFf9c25512Fb6dF10C871879A029` | WETH 1:1 | 2027-03-09 | USDC |
-| PT-zbUSD-30D | `0xa6D3A922AA36b37cD9E3fB7A0436aC7df310ae57` | USDC 1:1 | 2026-10-10 | USDC |
-| PT-zbUSD-180D | `0x4bd685DA37569691Cc7427B7Ce509a23bc70b044` | USDC 1:1 | 2027-03-09 | WETH |
-| PT-zbLINK-30D | `0x6D6FDf4D13d2B440CfbfD464A11C55af05964e96` | LINK 1:1 | 2026-10-10 | USDC |
-| PT-zbLINK-180D | `0x5e34350A960911490B9D78f3424BB4303EF29757` | LINK 1:1 | 2027-03-09 | WETH |
+| PT-zbETH-30D | [`0xc53C8D1fFBbb502E1a9004a93Ea33Adc2039F513`](https://sepolia.etherscan.io/address/0xc53C8D1fFBbb502E1a9004a93Ea33Adc2039F513) | WETH 1:1 | 2026-10-10 | USDC, WETH |
+| PT-zbETH-180D | [`0x4Ef8c0e1a313dFf9c25512Fb6dF10C871879A029`](https://sepolia.etherscan.io/address/0x4Ef8c0e1a313dFf9c25512Fb6dF10C871879A029) | WETH 1:1 | 2027-03-09 | USDC |
+| PT-zbUSD-30D | [`0xa6D3A922AA36b37cD9E3fB7A0436aC7df310ae57`](https://sepolia.etherscan.io/address/0xa6D3A922AA36b37cD9E3fB7A0436aC7df310ae57) | USDC 1:1 | 2026-10-10 | USDC |
+| PT-zbUSD-180D | [`0x4bd685DA37569691Cc7427B7Ce509a23bc70b044`](https://sepolia.etherscan.io/address/0x4bd685DA37569691Cc7427B7Ce509a23bc70b044) | USDC 1:1 | 2027-03-09 | WETH |
+| PT-zbLINK-30D | [`0x6D6FDf4D13d2B440CfbfD464A11C55af05964e96`](https://sepolia.etherscan.io/address/0x6D6FDf4D13d2B440CfbfD464A11C55af05964e96) | LINK 1:1 | 2026-10-10 | USDC |
+| PT-zbLINK-180D | [`0x5e34350A960911490B9D78f3424BB4303EF29757`](https://sepolia.etherscan.io/address/0x5e34350A960911490B9D78f3424BB4303EF29757) | LINK 1:1 | 2027-03-09 | WETH |
 
 All market config is in:
 
@@ -209,7 +209,7 @@ config/zubidubi-markets.json
 
 Live shared term-risk budget proof:
 
-- Budget-aware executor: `0x99488C09A54092Aa3C7e725137B45f3612CC5be1`
+- Budget-aware executor: [`0x99488C09A54092Aa3C7e725137B45f3612CC5be1`](https://sepolia.etherscan.io/address/0x99488C09A54092Aa3C7e725137B45f3612CC5be1)
 - Budget ID: `0x25df91de3b0b88921665b1290762b8328e4239985cab7fb629b0d44fb642012a`
 - Budget setup tx: `0xbfeb5d8d2054ff1957e572149f1921b4c91fa9c25849416c3ccb09f28101a2ed`
 - Assigned sibling strategies: `PT-zbETH-30D/USDC` and `PT-zbETH-180D/USDC`
