@@ -244,6 +244,21 @@ Live shared term-risk budget proof:
 - Solver quote now returns budget fields: `budgetRemainingIn = 0.006`, `budgetRemainingOut = 50`
 - Solver quote also returns normalized `budgetPressure` metadata, so `/sell` and `/playground` show budget utilization and active pressure bps beside each maker fill
 
+Live multi-maker public book proof:
+
+- Additional maker 1: [`0x59235DDD528B5970A3c7dFBa537C072a18B283e6`](https://sepolia.etherscan.io/address/0x59235DDD528B5970A3c7dFBa537C072a18B283e6)
+- Additional maker 2: [`0xc1F20Cb0Ad8928Ed95bF18c5e9AC49dCd740542a`](https://sepolia.etherscan.io/address/0xc1F20Cb0Ad8928Ed95bF18c5e9AC49dCd740542a)
+- Extra live order hashes:
+  - `PT-zbETH-30D/USDC`: `0xa51412cbb1973175537aa192e4d0cf7b4194486ea56b39244b93339dc3e58d19`
+  - `PT-zbETH-180D/USDC`: `0xb8c0957b983988f24293cd0546e1d68dc552220c564c2e5fb145d2362273e85d`
+  - `PT-zbUSD-30D/USDC`: `0x34bec99a66ee0f2d9c2d1451a4513d852797f23062eb7206fee8240afefc6c9f`
+  - `PT-zbETH-30D/USDC`: `0xe55023b8ad014728faad9cf579802affdf126739ace71f2cb4f4b30d711c26bb`
+  - `PT-zbETH-30D/WETH`: `0x94a461a2ed50093c8f459aab9da276c3708e115dc4ed5c0d04ab8d607525016f`
+  - `PT-zbLINK-30D/USDC`: `0xc5b3dc9d3a760711a7565b4255a279da39957da0227794a6a5408a9d21e3cc84`
+- The hosted subgraph indexes all six as `ACTIVE` with budget assignments and maker-specific `pressurePenaltyBps`.
+- The hosted solver now quotes `PT-zbETH-30D -> USDC` from three indexed strategies and can split one request across multiple makers.
+- The hosted solver also quotes `PT-zbETH-30D -> WETH` through maker 2, proving the alternate payout-token route is live.
+
 ## Repository Map
 
 ### Contracts and SwapVM changes
@@ -270,6 +285,7 @@ Live shared term-risk budget proof:
 | `swap-vm/script/RunZubiDubiSepoliaDemo.s.sol` | simple live strategy/fill demo |
 | `swap-vm/script/RunZubiDubiSepoliaRoutedDemo.s.sol` | routed fill demo with multiple curves |
 | `swap-vm/script/RunZubiDubiSepoliaMultiAssetBook.s.sol` | ships the multi-asset public book |
+| `swap-vm/script/RunZubiDubiSepoliaMultiMakerBook.s.sol` | ships extra public strategies from two additional maker EOAs with distinct curves and shared term-risk budgets |
 | `swap-vm/script/ZubiDubiConfig.sol` | shared addresses and token config |
 
 ### SDK changes
